@@ -1,0 +1,25 @@
+pre-commit:
+  jobs:
+    - name: biome
+      glob: '*.{js,mjs,ts,tsx,json}'
+      run: pnpm biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files} && git add {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: |
+        pnpm commitlint --edit {1}
+
+post-merge:
+  commands:
+    pnpm:
+      files: git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD
+      glob: '{package.json,pnpm-lock.yaml}'
+      run: pnpm install --frozen-lockfile
+
+post-checkout:
+  commands:
+    pnpm:
+      files: git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD
+      glob: '{package.json,pnpm-lock.yaml}'
+      run: pnpm install --frozen-lockfile
