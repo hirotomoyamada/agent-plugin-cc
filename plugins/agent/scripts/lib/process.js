@@ -56,7 +56,10 @@ export function terminateProcessTree(pid, options = {}) {
     const runCommandImpl = options.runCommandImpl ?? runCommand;
     const killImpl = options.killImpl ?? process.kill.bind(process);
     if (platform === "win32") {
-        const result = runCommandImpl("taskkill", ["/PID", String(pid), "/T", "/F"], { cwd: options.cwd, env: options.env });
+        const result = runCommandImpl("taskkill", ["/PID", String(pid), "/T", "/F"], {
+            cwd: options.cwd,
+            env: options.env
+        });
         if (!result.error && result.status === 0) {
             return { attempted: true, delivered: true, method: "taskkill", result };
         }

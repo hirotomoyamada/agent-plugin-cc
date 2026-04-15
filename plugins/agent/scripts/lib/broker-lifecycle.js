@@ -22,7 +22,10 @@ export async function waitForBrokerEndpoint(endpoint, timeoutMs = 2000) {
     while (Date.now() - start < timeoutMs) {
         const ready = await new Promise((resolve) => {
             const socket = connectToEndpoint(endpoint);
-            socket.on("connect", () => { socket.end(); resolve(true); });
+            socket.on("connect", () => {
+                socket.end();
+                resolve(true);
+            });
             socket.on("error", () => resolve(false));
         });
         if (ready) {
@@ -36,8 +39,13 @@ export async function sendBrokerShutdown(endpoint) {
     await new Promise((resolve) => {
         const socket = connectToEndpoint(endpoint);
         socket.setEncoding("utf8");
-        socket.on("connect", () => { socket.write(`${JSON.stringify({ id: 1, method: "broker/shutdown", params: {} })}\n`); });
-        socket.on("data", () => { socket.end(); resolve(undefined); });
+        socket.on("connect", () => {
+            socket.write(`${JSON.stringify({ id: 1, method: "broker/shutdown", params: {} })}\n`);
+        });
+        socket.on("data", () => {
+            socket.end();
+            resolve(undefined);
+        });
         socket.on("error", () => resolve(undefined));
         socket.on("close", () => resolve(undefined));
     });
@@ -111,7 +119,14 @@ export async function ensureBrokerSession(cwd, options = {}) {
     const child = spawnBrokerProcess({ scriptPath, cwd, endpoint, pidFile, logFile, env: options.env ?? process.env });
     const ready = await waitForBrokerEndpoint(endpoint, options.timeoutMs ?? 2000);
     if (!ready) {
-        teardownBrokerSession({ endpoint, pidFile, logFile, sessionDir, pid: child.pid ?? null, killProcess: options.killProcess ?? null });
+        teardownBrokerSession({
+            endpoint,
+            pidFile,
+            logFile,
+            sessionDir,
+            pid: child.pid ?? null,
+            killProcess: options.killProcess ?? null
+        });
         return null;
     }
     const session = { endpoint, pidFile, logFile, sessionDir, pid: child.pid ?? null };
@@ -123,7 +138,9 @@ export function teardownBrokerSession({ endpoint = null, pidFile, logFile, sessi
         try {
             killProcess(pid);
         }
-        catch { /* Ignore missing or already-exited broker processes. */ }
+        catch {
+            /* Ignore missing or already-exited broker processes. */
+        }
     }
     if (pidFile && fs.existsSync(pidFile)) {
         fs.unlinkSync(pidFile);
@@ -138,13 +155,17 @@ export function teardownBrokerSession({ endpoint = null, pidFile, logFile, sessi
                 fs.unlinkSync(target.path);
             }
         }
-        catch { /* Ignore malformed or already-removed broker endpoints during teardown. */ }
+        catch {
+            /* Ignore malformed or already-removed broker endpoints during teardown. */
+        }
     }
     const resolvedSessionDir = sessionDir ?? (pidFile ? path.dirname(pidFile) : logFile ? path.dirname(logFile) : null);
     if (resolvedSessionDir && fs.existsSync(resolvedSessionDir)) {
         try {
             fs.rmdirSync(resolvedSessionDir);
         }
-        catch { /* Ignore non-empty or missing directories. */ }
+        catch {
+            /* Ignore non-empty or missing directories. */
+        }
     }
 }

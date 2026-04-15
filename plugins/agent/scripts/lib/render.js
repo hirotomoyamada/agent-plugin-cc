@@ -38,29 +38,19 @@ function validateReviewResultShape(data) {
     return null;
 }
 function normalizeReviewFinding(finding, index) {
-    const source = finding && typeof finding === "object" && !Array.isArray(finding)
-        ? finding
-        : {};
+    const source = finding && typeof finding === "object" && !Array.isArray(finding) ? finding : {};
     const lineStart = Number.isInteger(source.line_start) && source.line_start > 0 ? source.line_start : null;
-    const lineEnd = Number.isInteger(source.line_end) &&
-        source.line_end > 0 &&
-        (!lineStart || source.line_end >= lineStart)
+    const lineEnd = Number.isInteger(source.line_end) && source.line_end > 0 && (!lineStart || source.line_end >= lineStart)
         ? source.line_end
         : lineStart;
     return {
-        severity: typeof source.severity === "string" && source.severity.trim()
-            ? source.severity.trim()
-            : "low",
-        title: typeof source.title === "string" && source.title.trim()
-            ? source.title.trim()
-            : `Finding ${index + 1}`,
-        body: typeof source.body === "string" && source.body.trim()
-            ? source.body.trim()
-            : "No details provided.",
+        severity: typeof source.severity === "string" && source.severity.trim() ? source.severity.trim() : "low",
+        title: typeof source.title === "string" && source.title.trim() ? source.title.trim() : `Finding ${index + 1}`,
+        body: typeof source.body === "string" && source.body.trim() ? source.body.trim() : "No details provided.",
         file: typeof source.file === "string" && source.file.trim() ? source.file.trim() : "unknown",
         line_start: lineStart,
         line_end: lineEnd,
-        recommendation: typeof source.recommendation === "string" ? source.recommendation.trim() : "",
+        recommendation: typeof source.recommendation === "string" ? source.recommendation.trim() : ""
     };
 }
 function normalizeReviewResultData(data) {
@@ -70,7 +60,7 @@ function normalizeReviewResultData(data) {
         findings: data.findings.map((finding, index) => normalizeReviewFinding(finding, index)),
         next_steps: data.next_steps
             .filter((step) => typeof step === "string" && step.trim())
-            .map((step) => step.trim()),
+            .map((step) => step.trim())
     };
 }
 function isStructuredReviewStoredResult(storedJob) {
@@ -78,8 +68,7 @@ function isStructuredReviewStoredResult(storedJob) {
     if (!result || typeof result !== "object" || Array.isArray(result)) {
         return false;
     }
-    return (Object.prototype.hasOwnProperty.call(result, "result") ||
-        Object.prototype.hasOwnProperty.call(result, "parseError"));
+    return (Object.prototype.hasOwnProperty.call(result, "result") || Object.prototype.hasOwnProperty.call(result, "parseError"));
 }
 function formatJobLine(job) {
     const parts = [job.id, `${job.status || "unknown"}`];
@@ -182,7 +171,7 @@ export function renderSetupReport(report) {
         `- auth: ${report.auth.detail}`,
         `- session runtime: ${report.sessionRuntime.label}`,
         `- review gate: ${report.reviewGateEnabled ? "enabled" : "disabled"}`,
-        "",
+        ""
     ];
     if (report.actionsTaken.length > 0) {
         lines.push("Actions taken:");
@@ -206,7 +195,7 @@ export function renderReviewResult(parsedResult, meta) {
             "",
             "Agent did not return valid structured JSON.",
             "",
-            `- Parse error: ${parsedResult.parseError}`,
+            `- Parse error: ${parsedResult.parseError}`
         ];
         if (parsedResult.rawOutput) {
             lines.push("", "Raw final message:", "", "```text", parsedResult.rawOutput, "```");
@@ -222,7 +211,7 @@ export function renderReviewResult(parsedResult, meta) {
             `Target: ${meta.targetLabel}`,
             "Agent returned JSON with an unexpected review shape.",
             "",
-            `- Validation error: ${validationError}`,
+            `- Validation error: ${validationError}`
         ];
         if (parsedResult.rawOutput) {
             lines.push("", "Raw final message:", "", "```text", parsedResult.rawOutput, "```");
@@ -239,7 +228,7 @@ export function renderReviewResult(parsedResult, meta) {
         `Verdict: ${data.verdict}`,
         "",
         data.summary,
-        "",
+        ""
     ];
     if (findings.length === 0) {
         lines.push("No material findings.");
@@ -267,12 +256,7 @@ export function renderReviewResult(parsedResult, meta) {
 export function renderNativeReviewResult(result, meta) {
     const stdout = result.stdout.trim();
     const stderr = result.stderr.trim();
-    const lines = [
-        `# Agent ${meta.reviewLabel}`,
-        "",
-        `Target: ${meta.targetLabel}`,
-        "",
-    ];
+    const lines = [`# Agent ${meta.reviewLabel}`, "", `Target: ${meta.targetLabel}`, ""];
     if (stdout) {
         lines.push(stdout);
     }
@@ -293,8 +277,7 @@ export function renderTaskResult(parsedResult, _meta) {
     if (rawOutput) {
         return rawOutput.endsWith("\n") ? rawOutput : `${rawOutput}\n`;
     }
-    const message = String(parsedResult?.failureMessage ?? "").trim() ||
-        "Agent did not return a final message.";
+    const message = String(parsedResult?.failureMessage ?? "").trim() || "Agent did not return a final message.";
     return `${message}\n`;
 }
 export function renderStatusReport(report) {
@@ -303,7 +286,7 @@ export function renderStatusReport(report) {
         "",
         `Session runtime: ${report.sessionRuntime.label}`,
         `Review gate: ${report.config.stopReviewGate ? "enabled" : "disabled"}`,
-        "",
+        ""
     ];
     if (report.running.length > 0) {
         appendActiveJobsTable(lines, report.running);
@@ -312,7 +295,7 @@ export function renderStatusReport(report) {
         for (const job of report.running) {
             pushJobDetails(lines, job, {
                 showElapsed: true,
-                showLog: true,
+                showLog: true
             });
         }
         lines.push("");
@@ -321,7 +304,7 @@ export function renderStatusReport(report) {
         lines.push("Latest finished:");
         pushJobDetails(lines, report.latestFinished, {
             showDuration: true,
-            showLog: report.latestFinished.status === "failed",
+            showLog: report.latestFinished.status === "failed"
         });
         lines.push("");
     }
@@ -330,7 +313,7 @@ export function renderStatusReport(report) {
         for (const job of report.recent) {
             pushJobDetails(lines, job, {
                 showDuration: true,
-                showLog: job.status === "failed",
+                showLog: job.status === "failed"
             });
         }
         lines.push("");
@@ -352,7 +335,7 @@ export function renderJobStatusReport(job) {
         showLog: true,
         showCancelHint: true,
         showResultHint: true,
-        showReviewHint: true,
+        showReviewHint: true
     });
     return `${lines.join("\n").trimEnd()}\n`;
 }
@@ -360,17 +343,14 @@ export function renderStoredJobResult(job, storedJob) {
     const threadId = storedJob?.threadId ?? job.threadId ?? null;
     const resumeCommand = threadId ? `agent resume ${threadId}` : null;
     if (isStructuredReviewStoredResult(storedJob) && storedJob?.rendered) {
-        const output = storedJob.rendered.endsWith("\n")
-            ? storedJob.rendered
-            : `${storedJob.rendered}\n`;
+        const output = storedJob.rendered.endsWith("\n") ? storedJob.rendered : `${storedJob.rendered}\n`;
         if (!threadId) {
             return output;
         }
         return `${output}\nAgent session ID: ${threadId}\nResume in Agent: ${resumeCommand}\n`;
     }
     const rawOutput = (typeof storedJob?.result?.rawOutput === "string" && storedJob.result.rawOutput) ||
-        (typeof storedJob?.result?.agent?.stdout === "string" &&
-            storedJob.result.agent.stdout) ||
+        (typeof storedJob?.result?.agent?.stdout === "string" && storedJob.result.agent.stdout) ||
         "";
     if (rawOutput) {
         const output = rawOutput.endsWith("\n") ? rawOutput : `${rawOutput}\n`;
@@ -380,20 +360,13 @@ export function renderStoredJobResult(job, storedJob) {
         return `${output}\nAgent session ID: ${threadId}\nResume in Agent: ${resumeCommand}\n`;
     }
     if (storedJob?.rendered) {
-        const output = storedJob.rendered.endsWith("\n")
-            ? storedJob.rendered
-            : `${storedJob.rendered}\n`;
+        const output = storedJob.rendered.endsWith("\n") ? storedJob.rendered : `${storedJob.rendered}\n`;
         if (!threadId) {
             return output;
         }
         return `${output}\nAgent session ID: ${threadId}\nResume in Agent: ${resumeCommand}\n`;
     }
-    const lines = [
-        `# ${job.title ?? "Agent Result"}`,
-        "",
-        `Job: ${job.id}`,
-        `Status: ${job.status}`,
-    ];
+    const lines = [`# ${job.title ?? "Agent Result"}`, "", `Job: ${job.id}`, `Status: ${job.status}`];
     if (threadId) {
         lines.push(`Agent session ID: ${threadId}`);
         lines.push(`Resume in Agent: ${resumeCommand}`);

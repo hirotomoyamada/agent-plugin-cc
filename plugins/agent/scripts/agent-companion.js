@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { parseArgs, splitRawArgumentString } from "./lib/args.js";
 import { DEFAULT_CONTINUE_PROMPT, buildPersistentTaskThreadName, findLatestTaskThread, getAgentAuthStatus, getAgentAvailability, getSessionRuntimeStatus, interruptAppServerTurn, parseStructuredOutput, readOutputSchema, runAppServerReview, runAppServerTurn } from "./lib/agent.js";
+import { parseArgs, splitRawArgumentString } from "./lib/args.js";
 import { readStdinIfPiped } from "./lib/fs.js";
 import { collectReviewContext, ensureGitRepository, resolveReviewTarget } from "./lib/git.js";
 import { buildSingleJobSnapshot, buildStatusSnapshot, readStoredJob, resolveCancelableJob, resolveResultJob, sortJobsNewestFirst } from "./lib/job-control.js";
@@ -25,7 +25,7 @@ function printUsage() {
         "  node dist/agent-companion.js setup [--enable-review-gate|--disable-review-gate] [--json]",
         "  node dist/agent-companion.js review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>]",
         "  node dist/agent-companion.js adversarial-review [--wait|--background] [--base <ref>] [--scope <auto|working-tree|branch>] [focus text]",
-        "  node dist/agent-companion.js task [--background] [--write] [--resume-last|--resume|--fresh] [--model <model>] [prompt]",
+        "  node dist/agent-companion.js task [--background] [--write] [--resume-last|--resume <thread-id>|--fresh] [--model <model>] [prompt]",
         "  node dist/agent-companion.js status [job-id] [--all] [--json]",
         "  node dist/agent-companion.js result [job-id] [--json]",
         "  node dist/agent-companion.js cancel [job-id] [--json]"
@@ -338,10 +338,13 @@ async function executeTaskRun(request) {
     ensureAgentAvailable(request.cwd);
     const taskMetadata = buildTaskRunMetadata({
         prompt: request.prompt,
-        resumeLast: request.resumeLast
+        resumeLast: request.resumeLast || Boolean(request.resumeId)
     });
     let resumeThreadId = null;
-    if (request.resumeLast) {
+    if (request.resumeId) {
+        resumeThreadId = request.resumeId;
+    }
+    else if (request.resumeLast) {
         const latestThread = await resolveLatestTrackedTaskThread(workspaceRoot, {
             excludeJobId: request.jobId
         });
@@ -458,8 +461,8 @@ function buildTaskJob(workspaceRoot, taskMetadata, write) {
         write
     });
 }
-function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, jobId }) {
-    return { cwd, model, effort, prompt, write, resumeLast, jobId };
+function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, resumeId, jobId }) {
+    return { cwd, model, effort, prompt, write, resumeLast, resumeId, jobId };
 }
 function readTaskPrompt(cwd, options, positionals) {
     if (options["prompt-file"]) {
@@ -563,8 +566,8 @@ async function handleReview(argv) {
 }
 async function handleTask(argv) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["model", "effort", "cwd", "prompt-file"],
-        booleanOptions: ["json", "write", "resume-last", "resume", "fresh", "background"],
+        valueOptions: ["model", "effort", "cwd", "prompt-file", "resume"],
+        booleanOptions: ["json", "write", "resume-last", "fresh", "background"],
         aliasMap: { m: "model" }
     });
     const cwd = resolveCommandCwd(options);
@@ -572,18 +575,19 @@ async function handleTask(argv) {
     const model = normalizeRequestedModel(options.model);
     const effort = options.effort ?? null;
     const prompt = readTaskPrompt(cwd, options, positionals);
-    const resumeLast = Boolean(options["resume-last"] || options.resume);
+    const resumeId = typeof options.resume === "string" ? options.resume : null;
+    const resumeLast = Boolean(options["resume-last"]);
     const fresh = Boolean(options.fresh);
-    if (resumeLast && fresh) {
+    if ((resumeLast || resumeId) && fresh) {
         throw new Error("Choose either --resume/--resume-last or --fresh.");
     }
     const write = Boolean(options.write);
-    const taskMetadata = buildTaskRunMetadata({ prompt, resumeLast });
+    const taskMetadata = buildTaskRunMetadata({ prompt, resumeLast: resumeLast || Boolean(resumeId) });
     if (options.background) {
         ensureAgentAvailable(cwd);
-        requireTaskRequest(prompt, resumeLast);
+        requireTaskRequest(prompt, resumeLast || Boolean(resumeId));
         const job = buildTaskJob(workspaceRoot, taskMetadata, write);
-        const request = buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, jobId: job.id });
+        const request = buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, resumeId, jobId: job.id });
         const { payload } = enqueueBackgroundTask(cwd, job, request);
         outputCommandResult(payload, renderQueuedTaskLaunch(payload), Boolean(options.json));
         return;
@@ -596,6 +600,7 @@ async function handleTask(argv) {
         prompt,
         write,
         resumeLast,
+        resumeId,
         jobId: job.id,
         onProgress: progress
     }), { json: options.json });

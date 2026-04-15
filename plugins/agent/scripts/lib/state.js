@@ -16,9 +16,9 @@ function defaultState() {
     return {
         version: STATE_VERSION,
         config: {
-            stopReviewGate: false,
+            stopReviewGate: false
         },
-        jobs: [],
+        jobs: []
     };
 }
 export function resolveStateDir(cwd) {
@@ -31,16 +31,10 @@ export function resolveStateDir(cwd) {
         canonicalWorkspaceRoot = workspaceRoot;
     }
     const slugSource = path.basename(workspaceRoot) || "workspace";
-    const slug = slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") ||
-        "workspace";
-    const hash = createHash("sha256")
-        .update(canonicalWorkspaceRoot)
-        .digest("hex")
-        .slice(0, 16);
+    const slug = slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
+    const hash = createHash("sha256").update(canonicalWorkspaceRoot).digest("hex").slice(0, 16);
     const pluginDataDir = process.env[PLUGIN_DATA_ENV];
-    const stateRoot = pluginDataDir
-        ? path.join(pluginDataDir, "state")
-        : FALLBACK_STATE_ROOT_DIR;
+    const stateRoot = pluginDataDir ? path.join(pluginDataDir, "state") : FALLBACK_STATE_ROOT_DIR;
     return path.join(stateRoot, `${slug}-${hash}`);
 }
 export function resolveStateFile(cwd) {
@@ -64,11 +58,9 @@ export function loadState(cwd) {
             ...parsed,
             config: {
                 ...defaultState().config,
-                ...(parsed.config ?? {}),
+                ...(parsed.config ?? {})
             },
-            jobs: Array.isArray(parsed.jobs)
-                ? parsed.jobs
-                : [],
+            jobs: Array.isArray(parsed.jobs) ? parsed.jobs : []
         };
     }
     catch {
@@ -93,9 +85,9 @@ export function saveState(cwd, state) {
         version: STATE_VERSION,
         config: {
             ...defaultState().config,
-            ...(state.config ?? {}),
+            ...(state.config ?? {})
         },
-        jobs: nextJobs,
+        jobs: nextJobs
     };
     const retainedIds = new Set(nextJobs.map((job) => job.id));
     for (const job of previousJobs) {
@@ -125,14 +117,14 @@ export function upsertJob(cwd, jobPatch) {
             state.jobs.unshift({
                 createdAt: timestamp,
                 updatedAt: timestamp,
-                ...jobPatch,
+                ...jobPatch
             });
             return;
         }
         state.jobs[existingIndex] = {
             ...state.jobs[existingIndex],
             ...jobPatch,
-            updatedAt: timestamp,
+            updatedAt: timestamp
         };
     });
 }

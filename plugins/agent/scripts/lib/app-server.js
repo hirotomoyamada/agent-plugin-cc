@@ -61,9 +61,13 @@ class AppServerClientBase {
         this.lineBuffer = "";
         this.transport = "unknown";
         this.exitResolved = false;
-        this.exitPromise = new Promise((resolve) => { this.resolveExit = resolve; });
+        this.exitPromise = new Promise((resolve) => {
+            this.resolveExit = resolve;
+        });
     }
-    setNotificationHandler(handler) { this.notificationHandler = handler; }
+    setNotificationHandler(handler) {
+        this.notificationHandler = handler;
+    }
     request(method, params) {
         if (this.closed) {
             throw new Error("agent app-server client is closed.");
@@ -100,7 +104,10 @@ class AppServerClientBase {
             message = JSON.parse(line);
         }
         catch (error) {
-            this.handleExit(createProtocolError(`Failed to parse agent app-server JSONL: ${error.message}`, { code: -32700, message: error.message }));
+            this.handleExit(createProtocolError(`Failed to parse agent app-server JSONL: ${error.message}`, {
+                code: -32700,
+                message: error.message
+            }));
             return;
         }
         if (message.id !== undefined && message.method) {
@@ -126,7 +133,10 @@ class AppServerClientBase {
         }
     }
     handleServerRequest(message) {
-        this.sendMessage({ id: message.id, error: buildJsonRpcError(-32601, `Unsupported server request: ${message.method}`) });
+        this.sendMessage({
+            id: message.id,
+            error: buildJsonRpcError(-32601, `Unsupported server request: ${message.method}`)
+        });
     }
     handleExit(error) {
         if (this.exitResolved) {
@@ -167,14 +177,22 @@ class SpawnedAgentAppServerClient extends AppServerClientBase {
         });
         this.proc.stdout.setEncoding("utf8");
         this.proc.stderr.setEncoding("utf8");
-        this.proc.stderr.on("data", (chunk) => { this.stderr += chunk; });
-        this.proc.on("error", (error) => { this.handleExit(error); });
+        this.proc.stderr.on("data", (chunk) => {
+            this.stderr += chunk;
+        });
+        this.proc.on("error", (error) => {
+            this.handleExit(error);
+        });
         this.proc.on("exit", (code, signal) => {
-            const detail = code === 0 ? null : createProtocolError(`agent app-server exited unexpectedly (${signal ? `signal ${signal}` : `exit ${code}`}).`);
+            const detail = code === 0
+                ? null
+                : createProtocolError(`agent app-server exited unexpectedly (${signal ? `signal ${signal}` : `exit ${code}`}).`);
             this.handleExit(detail);
         });
         this.readline = readline.createInterface({ input: this.proc.stdout });
-        this.readline.on("line", (line) => { this.handleLine(line); });
+        this.readline.on("line", (line) => {
+            this.handleLine(line);
+        });
         await this.request("initialize", {
             clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
             capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES
@@ -198,7 +216,9 @@ class SpawnedAgentAppServerClient extends AppServerClientBase {
                         try {
                             terminateProcessTree(this.proc.pid);
                         }
-                        catch { /* Best-effort cleanup */ }
+                        catch {
+                            /* Best-effort cleanup */
+                        }
                     }
                     else {
                         this.proc.kill("SIGTERM");
@@ -233,14 +253,18 @@ class BrokerAgentAppServerClient extends AppServerClientBase {
             this.socket = net.createConnection({ path: target.path });
             this.socket.setEncoding("utf8");
             this.socket.on("connect", () => resolve());
-            this.socket.on("data", (chunk) => { this.handleChunk(chunk); });
+            this.socket.on("data", (chunk) => {
+                this.handleChunk(chunk);
+            });
             this.socket.on("error", (error) => {
                 if (!this.exitResolved) {
                     reject(error);
                 }
                 this.handleExit(error);
             });
-            this.socket.on("close", () => { this.handleExit(this.exitError); });
+            this.socket.on("close", () => {
+                this.handleExit(this.exitError);
+            });
         });
         await this.request("initialize", {
             clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
@@ -272,7 +296,8 @@ export class AgentAppServerClient {
     static async connect(cwd, options = {}) {
         let brokerEndpoint = null;
         if (!options.disableBroker) {
-            brokerEndpoint = options.brokerEndpoint ?? options.env?.[BROKER_ENDPOINT_ENV] ?? process.env[BROKER_ENDPOINT_ENV] ?? null;
+            brokerEndpoint =
+                options.brokerEndpoint ?? options.env?.[BROKER_ENDPOINT_ENV] ?? process.env[BROKER_ENDPOINT_ENV] ?? null;
             if (!brokerEndpoint && options.reuseExistingBroker) {
                 brokerEndpoint = loadBrokerSession(cwd)?.endpoint ?? null;
             }

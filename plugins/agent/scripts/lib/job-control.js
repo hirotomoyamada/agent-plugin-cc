@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 import { getSessionRuntimeStatus } from "./agent.js";
-import { getConfig, listJobs, readJobFile, resolveJobFile, } from "./state.js";
+import { getConfig, listJobs, readJobFile, resolveJobFile } from "./state.js";
 import { SESSION_ID_ENV } from "./tracked-jobs.js";
 import { resolveWorkspaceRoot } from "./workspace.js";
 export const DEFAULT_MAX_STATUS_JOBS = 8;
@@ -10,9 +10,7 @@ export function sortJobsNewestFirst(jobs) {
     return [...jobs].sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")));
 }
 function getCurrentSessionId(options = {}) {
-    return (options.env?.[SESSION_ID_ENV] ??
-        process.env[SESSION_ID_ENV] ??
-        null);
+    return options.env?.[SESSION_ID_ENV] ?? process.env[SESSION_ID_ENV] ?? null;
 }
 function filterJobsForCurrentSession(jobs, options = {}) {
     const sessionId = getCurrentSessionId(options);
@@ -103,17 +101,13 @@ function inferLegacyJobPhase(job, progressPreview = []) {
     }
     for (let index = progressPreview.length - 1; index >= 0; index -= 1) {
         const line = progressPreview[index].toLowerCase();
-        if (line.startsWith("starting agent") ||
-            line.startsWith("thread ready") ||
-            line.startsWith("turn started")) {
+        if (line.startsWith("starting agent") || line.startsWith("thread ready") || line.startsWith("turn started")) {
             return "starting";
         }
         if (line.startsWith("reviewer started") || line.includes("review mode")) {
             return "reviewing";
         }
-        if (line.startsWith("searching:") ||
-            line.startsWith("calling ") ||
-            line.startsWith("running tool:")) {
+        if (line.startsWith("searching:") || line.startsWith("calling ") || line.startsWith("running tool:")) {
             return "investigating";
         }
         if (line.startsWith("starting collaboration tool:")) {
@@ -152,11 +146,11 @@ export function enrichJob(job, options = {}) {
         elapsed: formatElapsedDuration(job.startedAt ?? job.createdAt, job.completedAt ?? null),
         duration: job.status === "completed" || job.status === "failed" || job.status === "cancelled"
             ? formatElapsedDuration(job.startedAt ?? job.createdAt, job.completedAt ?? job.updatedAt)
-            : null,
+            : null
     };
     return {
         ...enriched,
-        phase: enriched.phase ?? inferLegacyJobPhase(enriched, enriched.progressPreview),
+        phase: enriched.phase ?? inferLegacyJobPhase(enriched, enriched.progressPreview)
     };
 }
 export function readStoredJob(workspaceRoot, jobId) {
@@ -194,9 +188,7 @@ export function buildStatusSnapshot(cwd, options = {}) {
         .filter((job) => job.status === "queued" || job.status === "running")
         .map((job) => enrichJob(job, { maxProgressLines }));
     const latestFinishedRaw = jobs.find((job) => job.status !== "queued" && job.status !== "running") ?? null;
-    const latestFinished = latestFinishedRaw
-        ? enrichJob(latestFinishedRaw, { maxProgressLines })
-        : null;
+    const latestFinished = latestFinishedRaw ? enrichJob(latestFinishedRaw, { maxProgressLines }) : null;
     const recent = (options.all ? jobs : jobs.slice(0, maxJobs))
         .filter((job) => job.status !== "queued" && job.status !== "running" && job.id !== latestFinished?.id)
         .map((job) => enrichJob(job, { maxProgressLines }));
@@ -207,7 +199,7 @@ export function buildStatusSnapshot(cwd, options = {}) {
         running,
         latestFinished,
         recent,
-        needsReview: Boolean(config.stopReviewGate),
+        needsReview: Boolean(config.stopReviewGate)
     };
 }
 export function buildSingleJobSnapshot(cwd, reference, options = {}) {
@@ -219,7 +211,7 @@ export function buildSingleJobSnapshot(cwd, reference, options = {}) {
     }
     return {
         workspaceRoot,
-        job: enrichJob(selected, { maxProgressLines: options.maxProgressLines }),
+        job: enrichJob(selected, { maxProgressLines: options.maxProgressLines })
     };
 }
 export function resolveResultJob(cwd, reference) {
