@@ -566,8 +566,8 @@ async function handleReview(argv) {
 }
 async function handleTask(argv) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["model", "effort", "cwd", "prompt-file", "resume"],
-        booleanOptions: ["json", "write", "resume-last", "fresh", "background"],
+        valueOptions: ["model", "effort", "cwd", "prompt-file", "resume-id"],
+        booleanOptions: ["json", "write", "resume-last", "resume", "fresh", "background"],
         aliasMap: { m: "model" }
     });
     const cwd = resolveCommandCwd(options);
@@ -575,11 +575,15 @@ async function handleTask(argv) {
     const model = normalizeRequestedModel(options.model);
     const effort = options.effort ?? null;
     const prompt = readTaskPrompt(cwd, options, positionals);
-    const resumeId = typeof options.resume === "string" ? options.resume : null;
-    const resumeLast = Boolean(options["resume-last"]);
+    const rawResumeId = typeof options["resume-id"] === "string" ? options["resume-id"] : null;
+    if (rawResumeId?.startsWith("-")) {
+        throw new Error(`Invalid --resume-id value: "${rawResumeId}". Provide a thread ID, not a flag.`);
+    }
+    const resumeId = rawResumeId;
+    const resumeLast = Boolean(options["resume-last"] || options.resume);
     const fresh = Boolean(options.fresh);
     if ((resumeLast || resumeId) && fresh) {
-        throw new Error("Choose either --resume/--resume-last or --fresh.");
+        throw new Error("Choose either --resume/--resume-last/--resume-id or --fresh.");
     }
     const write = Boolean(options.write);
     const taskMetadata = buildTaskRunMetadata({ prompt, resumeLast: resumeLast || Boolean(resumeId) });
