@@ -1023,7 +1023,13 @@ async function runAgentPrintMode(
     proc.stdin!.end();
 
     proc.on("error", reject);
-    proc.on("exit", () => {
+    proc.on("exit", (code) => {
+      const cleanedStderr = cleanAgentStderr(stderr);
+      if (code !== 0) {
+        const detail = cleanedStderr || stdout.trim() || "(no output)";
+        reject(new Error(`agent exited with code ${code}: ${detail}`));
+        return;
+      }
       try {
         const result = JSON.parse(stdout.trim());
         emitProgress(options.onProgress, `Agent task ${result.is_error ? "failed" : "completed"}.`, "finalizing");
@@ -1038,13 +1044,15 @@ async function runAgentPrintMode(
             status: result.is_error ? "failed" : "completed"
           },
           error: result.is_error ? { message: result.result } : null,
-          stderr: cleanAgentStderr(stderr),
+          stderr: cleanedStderr,
           fileChanges: [],
           touchedFiles: [],
           commandExecutions: []
         });
       } catch (_e) {
-        reject(new Error(`Failed to parse agent output: ${stdout.slice(0, 200)}`));
+        const stderrDetail = cleanedStderr ? ` | stderr: ${cleanedStderr}` : "";
+        const stdoutDetail = stdout.trim() ? ` | stdout: ${stdout.slice(0, 200)}` : " | stdout: (empty)";
+        reject(new Error(`Failed to parse agent output${stdoutDetail}${stderrDetail}`));
       }
     });
   });
