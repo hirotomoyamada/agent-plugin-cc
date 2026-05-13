@@ -15,24 +15,26 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome lint .",
-    "format": "biome format .",
-    "check": "biome check .",
+    "build": "tsgo",
+    "typecheck": "tsgo --noEmit",
+    "lint:check": "oxlint . --max-warnings=0",
+    "lint:fix": "oxlint . --max-warnings=0 --fix",
+    "format:check": "oxfmt --check .",
+    "format:write": "oxfmt --write .",
     "clean": "rimraf node_modules plugins/agent/scripts",
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "@commitlint/cli": "^20.5.0",
-    "@commitlint/config-conventional": "^20.5.0",
-    "@types/node": "^22.0.0",
-    "lefthook": "^2.1.5",
-    "rimraf": "^6.1.3",
-    "typescript": "^5.9.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["@biomejs/biome"]
+    "@commitlint/cli": "^21.0.1",
+    "@commitlint/config-conventional": "^21.0.1",
+    "@types/node": "^25.7.0",
+    "@typescript/native-preview": "7.0.0-dev.20260513.1",
+    "eslint-plugin-perfectionist": "^5.9.0",
+    "eslint-plugin-unused-imports": "^4.4.1",
+    "lefthook": "^2.1.6",
+    "oxfmt": "^0.49.0",
+    "oxlint": "^1.64.0",
+    "oxlint-tsgolint": "^0.22.1",
+    "rimraf": "^6.1.3"
   }
 }

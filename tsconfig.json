@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "compilerOptions": {
-    "target": "ES2024",
-    "module": "Node16",
-    "moduleResolution": "Node16",
-    "lib": ["ES2024"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext"],
     "outDir": "plugins/agent/scripts",
     "rootDir": "src",
     "strict": true,
@@ -15,8 +15,9 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "types": ["node"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "scripts"]
+  "exclude": ["node_modules", "plugins"]
 }

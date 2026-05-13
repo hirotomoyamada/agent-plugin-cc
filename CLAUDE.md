@@ -9,11 +9,12 @@ Claude Code plugin that integrates Cursor Agent for code review and task delegat
 ## Commands
 
 - `pnpm install` — install dependencies
-- `pnpm build` — compile TypeScript (`src/` → `plugins/agent/scripts/`)
-- `pnpm typecheck` — type-check without emitting
-- `pnpm lint` — run Biome linter
-- `pnpm check` — run Biome lint + format check
-- `pnpm format` — run Biome formatter
+- `pnpm build` — compile TypeScript with tsgo (`src/` → `plugins/agent/scripts/`)
+- `pnpm typecheck` — type-check with tsgo without emitting
+- `pnpm lint:check` — run oxlint (`--max-warnings=0`)
+- `pnpm lint:fix` — run oxlint with `--fix`
+- `pnpm format:check` — check formatting with oxfmt
+- `pnpm format:write` — apply formatting with oxfmt
 
 ## Architecture
 
@@ -37,6 +38,7 @@ TypeScript sources live in `src/`. The compiler outputs to `plugins/agent/script
 - **`render.ts`** — Formats payloads into human-readable CLI output (setup reports, review results, status tables).
 - **`git.ts`** — Git helpers: review target resolution, diff collection, branch detection.
 - **`prompts.ts`** — Loads and interpolates Markdown prompt templates from `plugins/agent/prompts/`.
+- **`strings.ts`** — `coerceString` helper for safely stringifying `unknown` values (returns the fallback for non-primitives instead of `[object Object]`).
 
 ### Plugin structure (`plugins/agent/`)
 
@@ -49,7 +51,8 @@ TypeScript sources live in `src/`. The compiler outputs to `plugins/agent/script
 
 ## Code Style
 
-- Biome handles linting and formatting: indent with 2 spaces, double quotes, semicolons, no trailing commas, 120 char line width
+- oxlint handles linting (`pnpm lint:check` / `pnpm lint:fix`); oxfmt handles formatting (`pnpm format:check` / `pnpm format:write`)
+- Type checking uses tsgo (TypeScript native preview); both `pnpm build` and `pnpm typecheck` invoke it
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (enforced by commitlint via lefthook)
-- Pre-commit hook runs `biome check --write` on staged files
+- Pre-commit hook runs oxlint + oxfmt on staged files
 - Node ≥ 24.14, pnpm 10.x
