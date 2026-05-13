@@ -6,7 +6,7 @@ export default defineConfig({
     builtin: true,
     node: true,
   },
-  ignorePatterns: ["plugins/*/scripts"],
+  ignorePatterns: ["plugins/*/scripts", "plugins/*/core", "src/**/*.js"],
   jsPlugins: ["eslint-plugin-unused-imports", "eslint-plugin-perfectionist"],
   options: { typeAware: true },
   plugins: ["eslint", "typescript", "unicorn", "import"],

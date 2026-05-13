@@ -1,0 +1,8 @@
+{
+  "name": "kimi",
+  "version": "1.0.0",
+  "description": "Use Moonshot Kimi from Claude Code to delegate coding tasks.",
+  "author": {
+    "name": "hirotomoyamada"
+  }
+}

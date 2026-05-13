@@ -4,7 +4,7 @@
     "name": "hirotomoyamada"
   },
   "metadata": {
-    "description": "Claude Code for delegation and code review.",
+    "description": "Multi-AI plugins for Claude Code: Cursor Agent, OpenAI Codex, and Moonshot Kimi.",
     "version": "1.0.0"
   },
   "plugins": [
@@ -25,6 +25,15 @@
         "name": "hirotomoyamada"
       },
       "source": "./plugins/codex"
+    },
+    {
+      "name": "kimi",
+      "description": "Use Moonshot Kimi from Claude Code to delegate coding tasks.",
+      "version": "1.0.0",
+      "author": {
+        "name": "hirotomoyamada"
+      },
+      "source": "./plugins/kimi"
     }
   ]
 }

@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.1.1",
   "private": true,
-  "description": "Use Cursor Agent from Claude Code to review code or delegate tasks.",
+  "description": "Multi-AI plugins for Claude Code: drive Cursor Agent, OpenAI Codex, or Moonshot Kimi from inside Claude Code for code review and task delegation.",
   "license": "MIT",
   "author": "Hirotomo Yamada <hirotomo.yamada@avap.co.jp>",
   "repository": {
@@ -15,15 +15,16 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "tsgo -p tsconfig.agent.json && tsgo -p tsconfig.codex.json",
-    "build:agent": "tsgo -p tsconfig.agent.json",
-    "build:codex": "tsgo -p tsconfig.codex.json",
-    "typecheck": "tsgo -p tsconfig.agent.json --noEmit && tsgo -p tsconfig.codex.json --noEmit",
+    "build": "pnpm build:agent && pnpm build:codex && pnpm build:kimi",
+    "build:agent": "tsgo -p tsconfig.agent.json && tsgo -p tsconfig.agent-core.json",
+    "build:codex": "tsgo -p tsconfig.codex.json && tsgo -p tsconfig.codex-core.json",
+    "build:kimi": "tsgo -p tsconfig.kimi.json && tsgo -p tsconfig.kimi-core.json",
+    "typecheck": "tsgo -p tsconfig.agent.json --noEmit && tsgo -p tsconfig.agent-core.json --noEmit && tsgo -p tsconfig.codex.json --noEmit && tsgo -p tsconfig.codex-core.json --noEmit && tsgo -p tsconfig.kimi.json --noEmit && tsgo -p tsconfig.kimi-core.json --noEmit",
     "lint:check": "oxlint . --max-warnings=0",
     "lint:fix": "oxlint . --max-warnings=0 --fix",
     "format:check": "oxfmt --check .",
     "format:write": "oxfmt --write .",
-    "clean": "rimraf node_modules plugins/agent/scripts plugins/codex/scripts",
+    "clean": "rimraf node_modules plugins/agent/scripts plugins/agent/core plugins/codex/scripts plugins/codex/core plugins/kimi/scripts plugins/kimi/core",
     "prepare": "lefthook install"
   },
   "devDependencies": {

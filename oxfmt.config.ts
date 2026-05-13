@@ -4,6 +4,8 @@ export default defineConfig({
   bracketSpacing: true,
   ignorePatterns: [
     "plugins/*/scripts",
+    "plugins/*/core",
+    "src/**/*.js",
     "trace",
     "node_modules",
     "pnpm-lock.yaml",

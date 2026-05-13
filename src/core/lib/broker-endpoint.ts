@@ -1,0 +1,55 @@
+import path from "node:path"
+import process from "node:process"
+
+import type { ProviderContext } from "./provider.js"
+
+function sanitizePipeName(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]/g, "-").replace(/^-+|-+$/g, "")
+}
+
+export interface PipeEndpoint {
+  kind: "pipe"
+  path: string
+}
+
+export interface UnixEndpoint {
+  kind: "unix"
+  path: string
+}
+
+export type BrokerEndpoint = PipeEndpoint | UnixEndpoint
+
+export function createBrokerEndpoint(
+  config: ProviderContext,
+  sessionDir: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform === "win32") {
+    const pipeName = sanitizePipeName(
+      `${path.win32.basename(sessionDir)}-${config.paths.socketSuffix}`,
+    )
+    return `pipe:\\\\.\\pipe\\${pipeName}`
+  }
+  return `unix:${path.join(sessionDir, "broker.sock")}`
+}
+
+export function parseBrokerEndpoint(endpoint: string): BrokerEndpoint {
+  if (typeof endpoint !== "string" || endpoint.length === 0) {
+    throw new Error("Missing broker endpoint.")
+  }
+  if (endpoint.startsWith("pipe:")) {
+    const pipePath = endpoint.slice("pipe:".length)
+    if (!pipePath) {
+      throw new Error("Broker pipe endpoint is missing its path.")
+    }
+    return { kind: "pipe" as const, path: pipePath }
+  }
+  if (endpoint.startsWith("unix:")) {
+    const socketPath = endpoint.slice("unix:".length)
+    if (!socketPath) {
+      throw new Error("Broker Unix socket endpoint is missing its path.")
+    }
+    return { kind: "unix" as const, path: socketPath }
+  }
+  throw new Error(`Unsupported broker endpoint: ${endpoint}`)
+}

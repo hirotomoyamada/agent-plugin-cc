@@ -1,9 +1,1 @@
-import { ensureGitRepository } from "./git.js";
-export function resolveWorkspaceRoot(cwd) {
-    try {
-        return ensureGitRepository(cwd);
-    }
-    catch {
-        return cwd;
-    }
-}
+export * from "../../core/lib/workspace.js";

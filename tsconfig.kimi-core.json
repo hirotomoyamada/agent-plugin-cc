@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "plugins/kimi/core",
+    "rootDir": "src/core"
+  },
+  "include": ["src/core"],
+  "exclude": ["node_modules", "plugins"]
+}

@@ -1,0 +1,10 @@
+import * as core from "../../core/lib/render.js";
+import { KIMI_PROVIDER } from "./provider-config.js";
+export const renderSetupReport = (report) => core.renderSetupReport(KIMI_PROVIDER, report);
+export const renderReviewResult = (parsedResult, meta) => core.renderReviewResult(KIMI_PROVIDER, parsedResult, meta);
+export const renderNativeReviewResult = (result, meta) => core.renderNativeReviewResult(KIMI_PROVIDER, result, meta);
+export const renderTaskResult = (parsedResult, meta) => core.renderTaskResult(KIMI_PROVIDER, parsedResult, meta);
+export const renderStatusReport = (report) => core.renderStatusReport(KIMI_PROVIDER, report);
+export const renderJobStatusReport = (job) => core.renderJobStatusReport(KIMI_PROVIDER, job);
+export const renderStoredJobResult = (job, storedJob) => core.renderStoredJobResult(KIMI_PROVIDER, job, storedJob);
+export const renderCancelReport = (job) => core.renderCancelReport(KIMI_PROVIDER, job);

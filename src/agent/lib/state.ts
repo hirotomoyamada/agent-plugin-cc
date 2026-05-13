@@ -1,228 +1,50 @@
-import { createHash } from "node:crypto"
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
+import * as core from "../../core/lib/state.js"
 
-import { coerceString } from "./strings.js"
-import { resolveWorkspaceRoot } from "./workspace.js"
+import { AGENT_PROVIDER } from "./provider-config.js"
 
-const STATE_VERSION = 1
-const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA"
-const FALLBACK_STATE_ROOT_DIR = path.join(os.tmpdir(), "agent-companion")
-const STATE_FILE_NAME = "state.json"
-const JOBS_DIR_NAME = "jobs"
-const MAX_JOBS = 50
+export const resolveStateDir = (cwd: string) =>
+  core.resolveStateDir(AGENT_PROVIDER, cwd)
 
-export interface JobRecord {
-  [key: string]: unknown
-  id: string
-}
+export const resolveStateFile = (cwd: string) =>
+  core.resolveStateFile(AGENT_PROVIDER, cwd)
 
-export interface StateConfig {
-  [key: string]: unknown
-  stopReviewGate: boolean
-}
+export const resolveJobsDir = (cwd: string) =>
+  core.resolveJobsDir(AGENT_PROVIDER, cwd)
 
-export interface AppState {
-  config: StateConfig
-  jobs: JobRecord[]
-  version: number
-}
+export const ensureStateDir = (cwd: string) =>
+  core.ensureStateDir(AGENT_PROVIDER, cwd)
 
-function nowIso(): string {
-  return new Date().toISOString()
-}
+export const loadState = (cwd: string) => core.loadState(AGENT_PROVIDER, cwd)
 
-function defaultState(): AppState {
-  return {
-    config: {
-      stopReviewGate: false,
-    },
-    jobs: [],
-    version: STATE_VERSION,
-  }
-}
+export const saveState = (cwd: string, state: core.AppState) =>
+  core.saveState(AGENT_PROVIDER, cwd, state)
 
-export function resolveStateDir(cwd: string): string {
-  const workspaceRoot = resolveWorkspaceRoot(cwd)
-  let canonicalWorkspaceRoot = workspaceRoot
-  try {
-    canonicalWorkspaceRoot = fs.realpathSync.native(workspaceRoot)
-  } catch {
-    canonicalWorkspaceRoot = workspaceRoot
-  }
-
-  const slugSource = path.basename(workspaceRoot) || "workspace"
-  const slug =
-    slugSource.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") ||
-    "workspace"
-  const hash = createHash("sha256")
-    .update(canonicalWorkspaceRoot)
-    .digest("hex")
-    .slice(0, 16)
-  const pluginDataDir = process.env[PLUGIN_DATA_ENV]
-  const stateRoot = pluginDataDir
-    ? path.join(pluginDataDir, "state")
-    : FALLBACK_STATE_ROOT_DIR
-  return path.join(stateRoot, `${slug}-${hash}`)
-}
-
-export function resolveStateFile(cwd: string): string {
-  return path.join(resolveStateDir(cwd), STATE_FILE_NAME)
-}
-
-export function resolveJobsDir(cwd: string): string {
-  return path.join(resolveStateDir(cwd), JOBS_DIR_NAME)
-}
-
-export function ensureStateDir(cwd: string): void {
-  fs.mkdirSync(resolveJobsDir(cwd), { recursive: true })
-}
-
-export function loadState(cwd: string): AppState {
-  const stateFile = resolveStateFile(cwd)
-  if (!fs.existsSync(stateFile)) {
-    return defaultState()
-  }
-
-  try {
-    const parsed = JSON.parse(fs.readFileSync(stateFile, "utf8")) as Record<
-      string,
-      unknown
-    >
-    return {
-      ...defaultState(),
-      ...parsed,
-      config: {
-        ...defaultState().config,
-        ...(parsed.config as Record<string, unknown> | undefined),
-      },
-      jobs: Array.isArray(parsed.jobs) ? (parsed.jobs as JobRecord[]) : [],
-    }
-  } catch {
-    return defaultState()
-  }
-}
-
-function pruneJobs(jobs: JobRecord[]): JobRecord[] {
-  return [...jobs]
-    .sort((left, right) =>
-      coerceString(right.updatedAt).localeCompare(coerceString(left.updatedAt)),
-    )
-    .slice(0, MAX_JOBS)
-}
-
-function removeFileIfExists(filePath: unknown): void {
-  if (filePath && typeof filePath === "string" && fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath)
-  }
-}
-
-export function saveState(cwd: string, state: AppState): AppState {
-  const previousJobs = loadState(cwd).jobs
-  ensureStateDir(cwd)
-  const nextJobs = pruneJobs(state.jobs ?? [])
-  const nextState: AppState = {
-    config: {
-      ...defaultState().config,
-      ...state.config,
-    },
-    jobs: nextJobs,
-    version: STATE_VERSION,
-  }
-
-  const retainedIds = new Set(nextJobs.map((job) => job.id))
-  for (const job of previousJobs) {
-    if (retainedIds.has(job.id)) {
-      continue
-    }
-    removeJobFile(resolveJobFile(cwd, job.id))
-    removeFileIfExists(job.logFile)
-  }
-
-  fs.writeFileSync(
-    resolveStateFile(cwd),
-    `${JSON.stringify(nextState, null, 2)}\n`,
-    "utf8",
-  )
-  return nextState
-}
-
-export function updateState(
+export const updateState = (
   cwd: string,
-  mutate: (state: AppState) => void,
-): AppState {
-  const state = loadState(cwd)
-  mutate(state)
-  return saveState(cwd, state)
-}
+  mutate: (state: core.AppState) => void,
+) => core.updateState(AGENT_PROVIDER, cwd, mutate)
 
-export function generateJobId(prefix = "job"): string {
-  const random = Math.random().toString(36).slice(2, 8)
-  return `${prefix}-${Date.now().toString(36)}-${random}`
-}
+export const upsertJob = (cwd: string, jobPatch: core.JobRecord) =>
+  core.upsertJob(AGENT_PROVIDER, cwd, jobPatch)
 
-export function upsertJob(cwd: string, jobPatch: JobRecord): AppState {
-  return updateState(cwd, (state) => {
-    const timestamp = nowIso()
-    const existingIndex = state.jobs.findIndex((job) => job.id === jobPatch.id)
-    if (existingIndex === -1) {
-      state.jobs.unshift({
-        createdAt: timestamp,
-        updatedAt: timestamp,
-        ...jobPatch,
-      })
-      return
-    }
-    state.jobs[existingIndex] = {
-      ...state.jobs[existingIndex],
-      ...jobPatch,
-      updatedAt: timestamp,
-    }
-  })
-}
+export const listJobs = (cwd: string) => core.listJobs(AGENT_PROVIDER, cwd)
 
-export function listJobs(cwd: string): JobRecord[] {
-  return loadState(cwd).jobs
-}
+export const setConfig = (cwd: string, key: string, value: unknown) =>
+  core.setConfig(AGENT_PROVIDER, cwd, key, value)
 
-export function setConfig(cwd: string, key: string, value: unknown): AppState {
-  return updateState(cwd, (state) => {
-    state.config = { ...state.config, [key]: value }
-  })
-}
+export const getConfig = (cwd: string) => core.getConfig(AGENT_PROVIDER, cwd)
 
-export function getConfig(cwd: string): StateConfig {
-  return loadState(cwd).config
-}
-
-export function writeJobFile(
+export const writeJobFile = (
   cwd: string,
   jobId: string,
   payload: Record<string, unknown>,
-): string {
-  ensureStateDir(cwd)
-  const jobFile = resolveJobFile(cwd, jobId)
-  fs.writeFileSync(jobFile, `${JSON.stringify(payload, null, 2)}\n`, "utf8")
-  return jobFile
-}
+) => core.writeJobFile(AGENT_PROVIDER, cwd, jobId, payload)
 
-export function readJobFile(jobFile: string): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(jobFile, "utf8")) as Record<string, unknown>
-}
+export const resolveJobLogFile = (cwd: string, jobId: string) =>
+  core.resolveJobLogFile(AGENT_PROVIDER, cwd, jobId)
 
-function removeJobFile(jobFile: string): void {
-  if (fs.existsSync(jobFile)) {
-    fs.unlinkSync(jobFile)
-  }
-}
+export const resolveJobFile = (cwd: string, jobId: string) =>
+  core.resolveJobFile(AGENT_PROVIDER, cwd, jobId)
 
-export function resolveJobLogFile(cwd: string, jobId: string): string {
-  ensureStateDir(cwd)
-  return path.join(resolveJobsDir(cwd), `${jobId}.log`)
-}
-
-export function resolveJobFile(cwd: string, jobId: string): string {
-  ensureStateDir(cwd)
-  return path.join(resolveJobsDir(cwd), `${jobId}.json`)
-}
+export { generateJobId, readJobFile } from "../../core/lib/state.js"
+export type { AppState, JobRecord, StateConfig } from "../../core/lib/state.js"

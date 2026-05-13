@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "plugins/codex/core",
+    "rootDir": "src/core"
+  },
+  "include": ["src/core"],
+  "exclude": ["node_modules", "plugins"]
+}

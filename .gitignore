@@ -22,6 +22,11 @@ yarn-error.log*
 .eslintcache
 *.tsbuildinfo
 
+# tsgo cross-rootDir emit leakage
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+
 # dotenv environment variables file
 .env
 .env.*

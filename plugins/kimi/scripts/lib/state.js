@@ -1,0 +1,17 @@
+import * as core from "../../core/lib/state.js";
+import { KIMI_PROVIDER } from "./provider-config.js";
+export const resolveStateDir = (cwd) => core.resolveStateDir(KIMI_PROVIDER, cwd);
+export const resolveStateFile = (cwd) => core.resolveStateFile(KIMI_PROVIDER, cwd);
+export const resolveJobsDir = (cwd) => core.resolveJobsDir(KIMI_PROVIDER, cwd);
+export const ensureStateDir = (cwd) => core.ensureStateDir(KIMI_PROVIDER, cwd);
+export const loadState = (cwd) => core.loadState(KIMI_PROVIDER, cwd);
+export const saveState = (cwd, state) => core.saveState(KIMI_PROVIDER, cwd, state);
+export const updateState = (cwd, mutate) => core.updateState(KIMI_PROVIDER, cwd, mutate);
+export const upsertJob = (cwd, jobPatch) => core.upsertJob(KIMI_PROVIDER, cwd, jobPatch);
+export const listJobs = (cwd) => core.listJobs(KIMI_PROVIDER, cwd);
+export const setConfig = (cwd, key, value) => core.setConfig(KIMI_PROVIDER, cwd, key, value);
+export const getConfig = (cwd) => core.getConfig(KIMI_PROVIDER, cwd);
+export const writeJobFile = (cwd, jobId, payload) => core.writeJobFile(KIMI_PROVIDER, cwd, jobId, payload);
+export const resolveJobLogFile = (cwd, jobId) => core.resolveJobLogFile(KIMI_PROVIDER, cwd, jobId);
+export const resolveJobFile = (cwd, jobId) => core.resolveJobFile(KIMI_PROVIDER, cwd, jobId);
+export { generateJobId, readJobFile } from "../../core/lib/state.js";

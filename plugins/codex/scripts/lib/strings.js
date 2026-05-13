@@ -1,14 +1,1 @@
-export function coerceString(value, fallback = "") {
-    if (value == null) {
-        return fallback;
-    }
-    if (typeof value === "string") {
-        return value;
-    }
-    if (typeof value === "number" ||
-        typeof value === "boolean" ||
-        typeof value === "bigint") {
-        return String(value);
-    }
-    return fallback;
-}
+export * from "../../core/lib/strings.js";
