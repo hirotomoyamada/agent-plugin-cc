@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 import { readJobFile, resolveJobFile, resolveJobLogFile, upsertJob, writeJobFile, } from "./state.js";
+import { coerceString } from "./strings.js";
 export const SESSION_ID_ENV = "AGENT_COMPANION_SESSION_ID";
 export function nowIso() {
     return new Date().toISOString();
@@ -9,35 +10,38 @@ function normalizeProgressEvent(value) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
         const obj = value;
         return {
-            message: String(obj.message ?? "").trim(),
+            logBody: obj.logBody == null ? null : coerceString(obj.logBody).trimEnd(),
+            logTitle: typeof obj.logTitle === "string" && obj.logTitle.trim()
+                ? obj.logTitle.trim()
+                : null,
+            message: coerceString(obj.message).trim(),
             phase: typeof obj.phase === "string" && obj.phase.trim()
                 ? obj.phase.trim()
                 : null,
+            stderrMessage: obj.stderrMessage == null
+                ? null
+                : coerceString(obj.stderrMessage).trim(),
             threadId: typeof obj.threadId === "string" && obj.threadId.trim()
                 ? obj.threadId.trim()
                 : null,
             turnId: typeof obj.turnId === "string" && obj.turnId.trim()
                 ? obj.turnId.trim()
                 : null,
-            stderrMessage: obj.stderrMessage == null ? null : String(obj.stderrMessage).trim(),
-            logTitle: typeof obj.logTitle === "string" && obj.logTitle.trim()
-                ? obj.logTitle.trim()
-                : null,
-            logBody: obj.logBody == null ? null : String(obj.logBody).trimEnd(),
         };
     }
+    const text = coerceString(value).trim();
     return {
-        message: String(value ?? "").trim(),
+        logBody: null,
+        logTitle: null,
+        message: text,
         phase: null,
+        stderrMessage: text,
         threadId: null,
         turnId: null,
-        stderrMessage: String(value ?? "").trim(),
-        logTitle: null,
-        logBody: null,
     };
 }
 export function appendLogLine(logFile, message) {
-    const normalized = String(message ?? "").trim();
+    const normalized = coerceString(message).trim();
     if (!logFile || !normalized) {
         return;
     }
@@ -47,7 +51,7 @@ export function appendLogBlock(logFile, title, body) {
     if (!logFile || !body) {
         return;
     }
-    fs.appendFileSync(logFile, `\n[${nowIso()}] ${title}\n${String(body).trimEnd()}\n`, "utf8");
+    fs.appendFileSync(logFile, `\n[${nowIso()}] ${title}\n${coerceString(body).trimEnd()}\n`, "utf8");
 }
 export function createJobLogFile(workspaceRoot, jobId, title) {
     const logFile = resolveJobLogFile(workspaceRoot, jobId);
@@ -102,7 +106,7 @@ export function createJobProgressUpdater(workspaceRoot, jobId) {
     };
 }
 export function createProgressReporter(options = {}) {
-    const { stderr = false, logFile = null, onEvent = null } = options;
+    const { logFile = null, onEvent = null, stderr = false } = options;
     if (!stderr && !logFile && !onEvent) {
         return null;
     }
@@ -127,11 +131,11 @@ function readStoredJobOrNull(workspaceRoot, jobId) {
 export async function runTrackedJob(job, runner, options = {}) {
     const runningRecord = {
         ...job,
-        status: "running",
-        startedAt: nowIso(),
+        logFile: options.logFile ?? job.logFile ?? null,
         phase: "starting",
         pid: process.pid,
-        logFile: options.logFile ?? job.logFile ?? null,
+        startedAt: nowIso(),
+        status: "running",
     };
     writeJobFile(job.workspaceRoot, job.id, runningRecord);
     upsertJob(job.workspaceRoot, { id: job.id, ...runningRecord });
@@ -141,24 +145,24 @@ export async function runTrackedJob(job, runner, options = {}) {
         const completedAt = nowIso();
         writeJobFile(job.workspaceRoot, job.id, {
             ...runningRecord,
+            completedAt,
+            phase: completionStatus === "completed" ? "done" : "failed",
+            pid: null,
+            rendered: execution.rendered,
+            result: execution.payload,
             status: completionStatus,
             threadId: execution.threadId ?? null,
             turnId: execution.turnId ?? null,
-            pid: null,
-            phase: completionStatus === "completed" ? "done" : "failed",
-            completedAt,
-            result: execution.payload,
-            rendered: execution.rendered,
         });
         upsertJob(job.workspaceRoot, {
+            completedAt,
             id: job.id,
-            status: completionStatus,
-            threadId: execution.threadId ?? null,
-            turnId: execution.turnId ?? null,
-            summary: execution.summary,
             phase: completionStatus === "completed" ? "done" : "failed",
             pid: null,
-            completedAt,
+            status: completionStatus,
+            summary: execution.summary,
+            threadId: execution.threadId ?? null,
+            turnId: execution.turnId ?? null,
         });
         appendLogBlock(options.logFile ?? job.logFile ?? null, "Final output", execution.rendered);
         return execution;
@@ -169,23 +173,23 @@ export async function runTrackedJob(job, runner, options = {}) {
         const completedAt = nowIso();
         writeJobFile(job.workspaceRoot, job.id, {
             ...existing,
-            status: "failed",
-            phase: "failed",
-            errorMessage,
-            pid: null,
             completedAt,
+            errorMessage,
             logFile: options.logFile ??
                 job.logFile ??
                 existing.logFile ??
                 null,
-        });
-        upsertJob(job.workspaceRoot, {
-            id: job.id,
-            status: "failed",
             phase: "failed",
             pid: null,
-            errorMessage,
+            status: "failed",
+        });
+        upsertJob(job.workspaceRoot, {
             completedAt,
+            errorMessage,
+            id: job.id,
+            phase: "failed",
+            pid: null,
+            status: "failed",
         });
         throw error;
     }

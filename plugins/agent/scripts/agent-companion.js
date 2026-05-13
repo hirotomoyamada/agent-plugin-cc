@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_CONTINUE_PROMPT, buildPersistentTaskThreadName, findLatestTaskThread, getAgentAuthStatus, getAgentAvailability, getSessionRuntimeStatus, interruptAppServerTurn, parseStructuredOutput, readOutputSchema, runAppServerReview, runAppServerTurn, } from "./lib/agent.js";
+import { buildPersistentTaskThreadName, DEFAULT_CONTINUE_PROMPT, findLatestTaskThread, getAgentAuthStatus, getAgentAvailability, getSessionRuntimeStatus, interruptAppServerTurn, parseStructuredOutput, readOutputSchema, runAppServerReview, runAppServerTurn, } from "./lib/agent.js";
 import { parseArgs, splitRawArgumentString } from "./lib/args.js";
 import { readStdinIfPiped } from "./lib/fs.js";
 import { collectReviewContext, ensureGitRepository, resolveReviewTarget, } from "./lib/git.js";
@@ -12,7 +12,8 @@ import { binaryAvailable, terminateProcessTree } from "./lib/process.js";
 import { interpolateTemplate, loadPromptTemplate } from "./lib/prompts.js";
 import { renderCancelReport, renderJobStatusReport, renderNativeReviewResult, renderReviewResult, renderSetupReport, renderStatusReport, renderStoredJobResult, renderTaskResult, } from "./lib/render.js";
 import { generateJobId, getConfig, listJobs, setConfig, upsertJob, writeJobFile, } from "./lib/state.js";
-import { SESSION_ID_ENV, appendLogLine, createJobLogFile, createJobProgressUpdater, createJobRecord, createProgressReporter, nowIso, runTrackedJob, } from "./lib/tracked-jobs.js";
+import { coerceString } from "./lib/strings.js";
+import { appendLogLine, createJobLogFile, createJobProgressUpdater, createJobRecord, createProgressReporter, nowIso, runTrackedJob, SESSION_ID_ENV, } from "./lib/tracked-jobs.js";
 import { resolveWorkspaceRoot } from "./lib/workspace.js";
 const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const REVIEW_SCHEMA = path.join(ROOT_DIR, "schemas", "review-output.schema.json");
@@ -46,7 +47,7 @@ function normalizeRequestedModel(model) {
     if (model == null) {
         return null;
     }
-    const normalized = String(model).trim();
+    const normalized = coerceString(model).trim();
     if (!normalized) {
         return null;
     }
@@ -67,7 +68,7 @@ function parseCommandInput(argv, config = {}) {
         ...config,
         aliasMap: {
             C: "cwd",
-            ...(config.aliasMap ?? {}),
+            ...config.aliasMap,
         },
     });
 }
@@ -83,9 +84,7 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 function shorten(text, limit = 96) {
-    const normalized = String(text ?? "")
-        .trim()
-        .replace(/\s+/g, " ");
+    const normalized = coerceString(text).trim().replace(/\s+/g, " ");
     if (!normalized) {
         return "";
     }
@@ -95,7 +94,7 @@ function shorten(text, limit = 96) {
     return `${normalized.slice(0, limit - 3)}...`;
 }
 function firstMeaningfulLine(text, fallback) {
-    const line = String(text ?? "")
+    const line = coerceString(text)
         .split(/\r?\n/)
         .map((value) => value.trim())
         .find(Boolean);
@@ -119,21 +118,21 @@ async function buildSetupReport(cwd, actionsTaken = []) {
         nextSteps.push("Optional: run `/agent:setup --enable-review-gate` to require a fresh review before stop.");
     }
     return {
-        ready: nodeStatus.available && agentStatus.available && authStatus.loggedIn,
-        node: nodeStatus,
-        npm: npmStatus,
+        actionsTaken,
         agent: agentStatus,
         auth: authStatus,
-        sessionRuntime: getSessionRuntimeStatus(process.env, workspaceRoot),
-        reviewGateEnabled: Boolean(config.stopReviewGate),
-        actionsTaken,
         nextSteps,
+        node: nodeStatus,
+        npm: npmStatus,
+        ready: nodeStatus.available && agentStatus.available && authStatus.loggedIn,
+        reviewGateEnabled: Boolean(config.stopReviewGate),
+        sessionRuntime: getSessionRuntimeStatus(process.env, workspaceRoot),
     };
 }
 async function handleSetup(argv) {
     const { options } = parseCommandInput(argv, {
-        valueOptions: ["cwd"],
         booleanOptions: ["json", "enable-review-gate", "disable-review-gate"],
+        valueOptions: ["cwd"],
     });
     if (options["enable-review-gate"] && options["disable-review-gate"]) {
         throw new Error("Choose either --enable-review-gate or --disable-review-gate.");
@@ -155,11 +154,11 @@ async function handleSetup(argv) {
 function buildAdversarialReviewPrompt(context, focusText) {
     const template = loadPromptTemplate(ROOT_DIR, "adversarial-review");
     return interpolateTemplate(template, {
+        REVIEW_COLLECTION_GUIDANCE: context.collectionGuidance,
+        REVIEW_INPUT: context.content,
         REVIEW_KIND: "Adversarial Review",
         TARGET_LABEL: context.target.label,
         USER_FOCUS: focusText || "No extra focus provided.",
-        REVIEW_COLLECTION_GUIDANCE: context.collectionGuidance,
-        REVIEW_INPUT: context.content,
     });
 }
 function ensureAgentAvailable(cwd) {
@@ -173,7 +172,7 @@ function buildNativeReviewTarget(target) {
         return { type: "uncommittedChanges" };
     }
     if (target.mode === "branch") {
-        return { type: "baseBranch", branch: target.baseRef };
+        return { branch: target.baseRef, type: "baseBranch" };
     }
     return null;
 }
@@ -221,8 +220,8 @@ async function waitForSingleJobSnapshot(cwd, reference, options = {}) {
     }
     return {
         ...snapshot,
-        waitTimedOut: isActiveJobStatus(String(snapshot.job.status)),
         timeoutMs,
+        waitTimedOut: isActiveJobStatus(String(snapshot.job.status)),
     };
 }
 async function resolveLatestTrackedTaskThread(cwd, options = {}) {
@@ -256,92 +255,92 @@ async function executeReviewRun(request) {
     if (reviewName === "Review") {
         const reviewTarget = validateNativeReviewRequest(target, focusText);
         const result = await runAppServerReview(request.cwd, {
-            target: reviewTarget,
             model: request.model,
             onProgress: request.onProgress,
+            target: reviewTarget,
         });
         const payload = {
-            review: reviewName,
-            target,
-            threadId: result.threadId,
-            sourceThreadId: result.sourceThreadId,
             agent: {
+                reasoning: result.reasoningSummary,
                 status: result.status,
                 stderr: result.stderr,
                 stdout: result.reviewText,
-                reasoning: result.reasoningSummary,
             },
+            review: reviewName,
+            sourceThreadId: result.sourceThreadId,
+            target,
+            threadId: result.threadId,
         };
         const rendered = renderNativeReviewResult({
             status: result.status,
-            stdout: result.reviewText,
             stderr: result.stderr,
+            stdout: result.reviewText,
         }, {
+            reasoningSummary: result.reasoningSummary,
             reviewLabel: reviewName,
             targetLabel: target.label,
-            reasoningSummary: result.reasoningSummary,
         });
         return {
             exitStatus: result.status,
-            threadId: result.threadId,
-            turnId: result.turnId,
+            jobClass: "review",
+            jobTitle: `Agent ${reviewName}`,
             payload,
             rendered,
             summary: firstMeaningfulLine(result.reviewText, `${reviewName} completed.`),
-            jobTitle: `Agent ${reviewName}`,
-            jobClass: "review",
             targetLabel: target.label,
+            threadId: result.threadId,
+            turnId: result.turnId,
         };
     }
     const context = collectReviewContext(request.cwd, target);
     const prompt = buildAdversarialReviewPrompt(context, focusText);
     const result = await runAppServerTurn(context.repoRoot, {
-        prompt,
         model: request.model,
-        sandbox: "read-only",
-        outputSchema: readOutputSchema(REVIEW_SCHEMA),
         onProgress: request.onProgress,
+        outputSchema: readOutputSchema(REVIEW_SCHEMA),
+        prompt,
+        sandbox: "read-only",
     });
     const parsed = parseStructuredOutput(result.finalMessage, {
-        status: result.status,
         failureMessage: result.error?.message ?? result.stderr,
+        status: result.status,
     });
     const payload = {
-        review: reviewName,
-        target,
-        threadId: result.threadId,
-        context: {
-            repoRoot: context.repoRoot,
-            branch: context.branch,
-            summary: context.summary,
-        },
         agent: {
+            reasoning: result.reasoningSummary,
             status: result.status,
             stderr: result.stderr,
             stdout: result.finalMessage,
-            reasoning: result.reasoningSummary,
         },
-        result: parsed.parsed,
-        rawOutput: parsed.rawOutput,
+        context: {
+            branch: context.branch,
+            repoRoot: context.repoRoot,
+            summary: context.summary,
+        },
         parseError: parsed.parseError,
+        rawOutput: parsed.rawOutput,
         reasoningSummary: result.reasoningSummary,
+        result: parsed.parsed,
+        review: reviewName,
+        target,
+        threadId: result.threadId,
     };
     return {
         exitStatus: result.status,
-        threadId: result.threadId,
-        turnId: result.turnId,
+        jobClass: "review",
+        jobTitle: `Agent ${reviewName}`,
         payload,
         rendered: renderReviewResult(parsed, {
+            reasoningSummary: result.reasoningSummary,
             reviewLabel: reviewName,
             targetLabel: context.target.label,
-            reasoningSummary: result.reasoningSummary,
         }),
         summary: parsed.parsed?.summary ??
             parsed.parseError ??
             firstMeaningfulLine(result.finalMessage, `${reviewName} finished.`),
-        jobTitle: `Agent ${reviewName}`,
-        jobClass: "review",
         targetLabel: context.target.label,
+        threadId: result.threadId,
+        turnId: result.turnId,
     };
 }
 async function executeTaskRun(request) {
@@ -368,14 +367,14 @@ async function executeTaskRun(request) {
         throw new Error("Provide a prompt, a prompt file, piped stdin, or use --resume-last.");
     }
     const result = await runAppServerTurn(workspaceRoot, {
-        resumeThreadId,
-        prompt: request.prompt,
         defaultPrompt: resumeThreadId ? DEFAULT_CONTINUE_PROMPT : "",
-        model: request.model,
         effort: request.effort,
-        sandbox: request.write ? "workspace-write" : "read-only",
+        model: request.model,
         onProgress: request.onProgress,
         persistThread: true,
+        prompt: request.prompt,
+        resumeThreadId,
+        sandbox: request.write ? "workspace-write" : "read-only",
         threadName: resumeThreadId
             ? null
             : buildPersistentTaskThreadName(request.prompt || DEFAULT_CONTINUE_PROMPT),
@@ -383,52 +382,52 @@ async function executeTaskRun(request) {
     const rawOutput = typeof result.finalMessage === "string" ? result.finalMessage : "";
     const failureMessage = result.error?.message ?? result.stderr ?? "";
     const rendered = renderTaskResult({
-        rawOutput,
         failureMessage,
+        rawOutput,
         reasoningSummary: result.reasoningSummary,
     }, {
-        title: taskMetadata.title,
         jobId: request.jobId ?? null,
+        title: taskMetadata.title,
         write: Boolean(request.write),
     });
     const payload = {
+        rawOutput,
+        reasoningSummary: result.reasoningSummary,
         status: result.status,
         threadId: result.threadId,
-        rawOutput,
         touchedFiles: result.touchedFiles,
-        reasoningSummary: result.reasoningSummary,
     };
     return {
         exitStatus: result.status,
-        threadId: result.threadId,
-        turnId: result.turnId,
+        jobClass: "task",
+        jobTitle: taskMetadata.title,
         payload,
         rendered,
         summary: firstMeaningfulLine(rawOutput, firstMeaningfulLine(failureMessage, `${taskMetadata.title} finished.`)),
-        jobTitle: taskMetadata.title,
-        jobClass: "task",
+        threadId: result.threadId,
+        turnId: result.turnId,
         write: Boolean(request.write),
     };
 }
 function buildReviewJobMetadata(reviewName, target) {
     return {
         kind: reviewName === "Adversarial Review" ? "adversarial-review" : "review",
-        title: reviewName === "Review" ? "Agent Review" : `Agent ${reviewName}`,
         summary: `${reviewName} ${target.label}`,
+        title: reviewName === "Review" ? "Agent Review" : `Agent ${reviewName}`,
     };
 }
 function buildTaskRunMetadata({ prompt, resumeLast = false, }) {
     if (!resumeLast && String(prompt ?? "").includes(STOP_REVIEW_TASK_MARKER)) {
         return {
-            title: "Agent Stop Gate Review",
             summary: "Stop-gate review of previous Claude turn",
+            title: "Agent Stop Gate Review",
         };
     }
     const title = resumeLast ? "Agent Resume" : "Agent Task";
     const fallbackSummary = resumeLast ? DEFAULT_CONTINUE_PROMPT : "Task";
     return {
-        title,
         summary: shorten(prompt || fallbackSummary),
+        title,
     };
 }
 function renderQueuedTaskLaunch(payload) {
@@ -440,15 +439,15 @@ function getJobKindLabel(kind, jobClass) {
     }
     return jobClass === "review" ? "review" : "rescue";
 }
-function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summary, write = false, }) {
+function createCompanionJob({ jobClass, kind, prefix, summary, title, workspaceRoot, write = false, }) {
     return createJobRecord({
         id: generateJobId(prefix),
+        jobClass,
         kind,
         kindLabel: getJobKindLabel(kind, jobClass),
+        summary,
         title,
         workspaceRoot,
-        jobClass,
-        summary,
         write,
     });
 }
@@ -457,25 +456,25 @@ function createTrackedProgress(job, options = {}) {
     return {
         logFile,
         progress: createProgressReporter({
-            stderr: Boolean(options.stderr),
             logFile,
             onEvent: createJobProgressUpdater(job.workspaceRoot, job.id),
+            stderr: Boolean(options.stderr),
         }),
     };
 }
 function buildTaskJob(workspaceRoot, taskMetadata, write) {
     return createCompanionJob({
-        prefix: "task",
+        jobClass: "task",
         kind: "task",
+        prefix: "task",
+        summary: taskMetadata.summary,
         title: taskMetadata.title,
         workspaceRoot,
-        jobClass: "task",
-        summary: taskMetadata.summary,
         write,
     });
 }
-function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, resumeId, jobId, }) {
-    return { cwd, model, effort, prompt, write, resumeLast, resumeId, jobId };
+function buildTaskRequest({ cwd, effort, jobId, model, prompt, resumeId, resumeLast, write, }) {
+    return { cwd, effort, jobId, model, prompt, resumeId, resumeLast, write };
 }
 function readTaskPrompt(cwd, options, positionals) {
     if (options["prompt-file"]) {
@@ -507,8 +506,8 @@ function spawnDetachedTaskWorker(cwd, jobId) {
     const scriptPath = path.join(ROOT_DIR, "dist", "agent-companion.js");
     const child = spawn(process.execPath, [scriptPath, "task-worker", "--cwd", cwd, "--job-id", jobId], {
         cwd,
-        env: process.env,
         detached: true,
+        env: process.env,
         stdio: "ignore",
         windowsHide: true,
     });
@@ -521,30 +520,30 @@ function enqueueBackgroundTask(cwd, job, request) {
     const child = spawnDetachedTaskWorker(cwd, job.id);
     const queuedRecord = {
         ...job,
-        status: "queued",
+        logFile,
         phase: "queued",
         pid: child.pid ?? null,
-        logFile,
         request,
+        status: "queued",
     };
     writeJobFile(job.workspaceRoot, job.id, queuedRecord);
     upsertJob(job.workspaceRoot, queuedRecord);
     return {
+        logFile,
         payload: {
             jobId: job.id,
-            status: "queued",
-            title: job.title,
-            summary: job.summary,
             logFile,
+            status: "queued",
+            summary: job.summary,
+            title: job.title,
         },
-        logFile,
     };
 }
 async function handleReviewCommand(argv, config) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["base", "scope", "model", "cwd"],
-        booleanOptions: ["json", "background", "wait"],
         aliasMap: { m: "model" },
+        booleanOptions: ["json", "background", "wait"],
+        valueOptions: ["base", "scope", "model", "cwd"],
     });
     const cwd = resolveCommandCwd(options);
     const workspaceRoot = resolveCommandWorkspace(options);
@@ -556,21 +555,21 @@ async function handleReviewCommand(argv, config) {
     config.validateRequest?.(target, focusText);
     const metadata = buildReviewJobMetadata(config.reviewName, target);
     const job = createCompanionJob({
-        prefix: "review",
+        jobClass: "review",
         kind: metadata.kind,
+        prefix: "review",
+        summary: metadata.summary,
         title: metadata.title,
         workspaceRoot,
-        jobClass: "review",
-        summary: metadata.summary,
     });
     await runForegroundCommand(job, (progress) => executeReviewRun({
-        cwd,
         base: options.base,
-        scope: options.scope,
-        model: options.model,
+        cwd,
         focusText,
-        reviewName: config.reviewName,
+        model: options.model,
         onProgress: progress,
+        reviewName: config.reviewName,
+        scope: options.scope,
     }), { json: options.json });
 }
 async function handleReview(argv) {
@@ -581,7 +580,7 @@ async function handleReview(argv) {
 }
 async function handleTask(argv) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["model", "effort", "cwd", "prompt-file", "resume-id"],
+        aliasMap: { m: "model" },
         booleanOptions: [
             "json",
             "write",
@@ -590,7 +589,7 @@ async function handleTask(argv) {
             "fresh",
             "background",
         ],
-        aliasMap: { m: "model" },
+        valueOptions: ["model", "effort", "cwd", "prompt-file", "resume-id"],
     });
     const cwd = resolveCommandCwd(options);
     const workspaceRoot = resolveCommandWorkspace(options);
@@ -618,13 +617,13 @@ async function handleTask(argv) {
         const job = buildTaskJob(workspaceRoot, taskMetadata, write);
         const request = buildTaskRequest({
             cwd,
-            model,
             effort,
-            prompt,
-            write,
-            resumeLast,
-            resumeId,
             jobId: job.id,
+            model,
+            prompt,
+            resumeId,
+            resumeLast,
+            write,
         });
         const { payload } = enqueueBackgroundTask(cwd, job, request);
         outputCommandResult(payload, renderQueuedTaskLaunch(payload), Boolean(options.json));
@@ -633,14 +632,14 @@ async function handleTask(argv) {
     const job = buildTaskJob(workspaceRoot, taskMetadata, write);
     await runForegroundCommand(job, (progress) => executeTaskRun({
         cwd,
-        model,
         effort,
-        prompt,
-        write,
-        resumeLast,
-        resumeId,
         jobId: job.id,
+        model,
         onProgress: progress,
+        prompt,
+        resumeId,
+        resumeLast,
+        write,
     }), { json: options.json });
 }
 async function handleTaskWorker(argv) {
@@ -661,20 +660,20 @@ async function handleTaskWorker(argv) {
         throw new Error(`Stored job ${options["job-id"]} is missing its task request payload.`);
     }
     const { logFile, progress } = createTrackedProgress({ ...storedJob, workspaceRoot }, { logFile: storedJob.logFile ?? null });
-    await runTrackedJob({ ...storedJob, workspaceRoot, logFile }, () => executeTaskRun({ ...request, onProgress: progress }), { logFile });
+    await runTrackedJob({ ...storedJob, logFile, workspaceRoot }, () => executeTaskRun({ ...request, onProgress: progress }), { logFile });
 }
 async function handleStatus(argv) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["cwd", "timeout-ms", "poll-interval-ms"],
         booleanOptions: ["json", "all", "wait"],
+        valueOptions: ["cwd", "timeout-ms", "poll-interval-ms"],
     });
     const cwd = resolveCommandCwd(options);
     const reference = positionals[0] ?? "";
     if (reference) {
         const snapshot = options.wait
             ? await waitForSingleJobSnapshot(cwd, reference, {
-                timeoutMs: options["timeout-ms"],
                 pollIntervalMs: options["poll-interval-ms"],
+                timeoutMs: options["timeout-ms"],
             })
             : buildSingleJobSnapshot(cwd, reference);
         outputCommandResult(snapshot, renderJobStatusReport(snapshot.job), Boolean(options.json));
@@ -688,20 +687,20 @@ async function handleStatus(argv) {
 }
 function handleResult(argv) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["cwd"],
         booleanOptions: ["json"],
+        valueOptions: ["cwd"],
     });
     const cwd = resolveCommandCwd(options);
     const reference = positionals[0] ?? "";
-    const { workspaceRoot, job } = resolveResultJob(cwd, reference);
+    const { job, workspaceRoot } = resolveResultJob(cwd, reference);
     const storedJob = readStoredJob(workspaceRoot, job.id);
     const payload = { job, storedJob };
     outputCommandResult(payload, renderStoredJobResult(job, storedJob), Boolean(options.json));
 }
 function handleTaskResumeCandidate(argv) {
     const { options } = parseCommandInput(argv, {
-        valueOptions: ["cwd"],
         booleanOptions: ["json"],
+        valueOptions: ["cwd"],
     });
     const _cwd = resolveCommandCwd(options);
     const workspaceRoot = resolveCommandWorkspace(options);
@@ -710,18 +709,18 @@ function handleTaskResumeCandidate(argv) {
     const candidate = findLatestResumableTaskJob(jobs);
     const payload = {
         available: Boolean(candidate),
-        sessionId,
         candidate: candidate == null
             ? null
             : {
+                completedAt: candidate.completedAt ?? null,
                 id: candidate.id,
                 status: candidate.status,
-                title: candidate.title ?? null,
                 summary: candidate.summary ?? null,
                 threadId: candidate.threadId,
-                completedAt: candidate.completedAt ?? null,
+                title: candidate.title ?? null,
                 updatedAt: candidate.updatedAt ?? null,
             },
+        sessionId,
     };
     const rendered = candidate
         ? `Resumable task found: ${candidate.id} (${candidate.status}).\n`
@@ -730,12 +729,12 @@ function handleTaskResumeCandidate(argv) {
 }
 async function handleCancel(argv) {
     const { options, positionals } = parseCommandInput(argv, {
-        valueOptions: ["cwd"],
         booleanOptions: ["json"],
+        valueOptions: ["cwd"],
     });
     const cwd = resolveCommandCwd(options);
     const reference = positionals[0] ?? "";
-    const { workspaceRoot, job } = resolveCancelableJob(cwd, reference, {
+    const { job, workspaceRoot } = resolveCancelableJob(cwd, reference, {
         env: process.env,
     });
     const existing = readStoredJob(workspaceRoot, job.id) ?? {};
@@ -752,11 +751,11 @@ async function handleCancel(argv) {
     const completedAt = nowIso();
     const nextJob = {
         ...job,
-        status: "cancelled",
-        phase: "cancelled",
-        pid: null,
         completedAt,
         errorMessage: "Cancelled by user.",
+        phase: "cancelled",
+        pid: null,
+        status: "cancelled",
     };
     writeJobFile(workspaceRoot, job.id, {
         ...existing,
@@ -764,12 +763,12 @@ async function handleCancel(argv) {
         cancelledAt: completedAt,
     });
     upsertJob(workspaceRoot, {
+        completedAt,
+        errorMessage: "Cancelled by user.",
         id: job.id,
-        status: "cancelled",
         phase: "cancelled",
         pid: null,
-        errorMessage: "Cancelled by user.",
-        completedAt,
+        status: "cancelled",
     });
     const payload = {
         jobId: job.id,

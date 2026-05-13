@@ -1,3 +1,4 @@
+import { coerceString } from "./strings.js";
 function severityRank(severity) {
     switch (severity) {
         case "critical":
@@ -50,33 +51,33 @@ function normalizeReviewFinding(finding, index) {
         ? source.line_end
         : lineStart;
     return {
-        severity: typeof source.severity === "string" && source.severity.trim()
-            ? source.severity.trim()
-            : "low",
-        title: typeof source.title === "string" && source.title.trim()
-            ? source.title.trim()
-            : `Finding ${index + 1}`,
         body: typeof source.body === "string" && source.body.trim()
             ? source.body.trim()
             : "No details provided.",
         file: typeof source.file === "string" && source.file.trim()
             ? source.file.trim()
             : "unknown",
-        line_start: lineStart,
         line_end: lineEnd,
+        line_start: lineStart,
         recommendation: typeof source.recommendation === "string"
             ? source.recommendation.trim()
             : "",
+        severity: typeof source.severity === "string" && source.severity.trim()
+            ? source.severity.trim()
+            : "low",
+        title: typeof source.title === "string" && source.title.trim()
+            ? source.title.trim()
+            : `Finding ${index + 1}`,
     };
 }
 function normalizeReviewResultData(data) {
     return {
-        verdict: data.verdict.trim(),
-        summary: data.summary.trim(),
         findings: data.findings.map((finding, index) => normalizeReviewFinding(finding, index)),
         next_steps: data.next_steps
             .filter((step) => typeof step === "string" && step.trim())
             .map((step) => step.trim()),
+        summary: data.summary.trim(),
+        verdict: data.verdict.trim(),
     };
 }
 function isStructuredReviewStoredResult(storedJob) {
@@ -98,10 +99,7 @@ function formatJobLine(job) {
     return parts.join(" | ");
 }
 function escapeMarkdownCell(value) {
-    return String(value ?? "")
-        .replace(/\|/g, "\\|")
-        .replace(/\r?\n/g, " ")
-        .trim();
+    return coerceString(value).replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
 }
 function formatAgentResumeCommand(job) {
     if (!job?.threadId) {
@@ -175,7 +173,7 @@ function appendReasoningSection(lines, reasoningSummary) {
     }
     lines.push("", "Reasoning:");
     for (const section of reasoningSummary) {
-        lines.push(`- ${section}`);
+        lines.push(`- ${coerceString(section)}`);
     }
 }
 export function renderSetupReport(report) {
@@ -356,10 +354,10 @@ export function renderStatusReport(report) {
 export function renderJobStatusReport(job) {
     const lines = ["# Agent Job Status", ""];
     pushJobDetails(lines, job, {
-        showElapsed: job.status === "queued" || job.status === "running",
-        showDuration: job.status !== "queued" && job.status !== "running",
-        showLog: true,
         showCancelHint: true,
+        showDuration: job.status !== "queued" && job.status !== "running",
+        showElapsed: job.status === "queued" || job.status === "running",
+        showLog: true,
         showResultHint: true,
         showReviewHint: true,
     });

@@ -2,12 +2,13 @@ import fs from "node:fs";
 import process from "node:process";
 import { getSessionRuntimeStatus } from "./agent.js";
 import { getConfig, listJobs, readJobFile, resolveJobFile, } from "./state.js";
+import { coerceString } from "./strings.js";
 import { SESSION_ID_ENV } from "./tracked-jobs.js";
 import { resolveWorkspaceRoot } from "./workspace.js";
 export const DEFAULT_MAX_STATUS_JOBS = 8;
 export const DEFAULT_MAX_PROGRESS_LINES = 4;
 export function sortJobsNewestFirst(jobs) {
-    return [...jobs].sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")));
+    return [...jobs].sort((left, right) => coerceString(right.updatedAt).localeCompare(coerceString(left.updatedAt)));
 }
 function getCurrentSessionId(options = {}) {
     return (options.env?.[SESSION_ID_ENV] ??
@@ -47,8 +48,8 @@ function stripLogPrefix(line) {
 }
 function isProgressBlockTitle(line) {
     return ([
-        "Final output",
         "Assistant message",
+        "Final output",
         "Reasoning summary",
         "Review output",
     ].includes(line) ||
@@ -150,14 +151,6 @@ export function enrichJob(job, options = {}) {
     const maxProgressLines = options.maxProgressLines ?? DEFAULT_MAX_PROGRESS_LINES;
     const enriched = {
         ...job,
-        kindLabel: getJobTypeLabel(job),
-        progressPreview: job.status === "queued" ||
-            job.status === "running" ||
-            job.status === "failed"
-            ? readJobProgressPreview(job.logFile, maxProgressLines)
-            : [],
-        elapsed: formatElapsedDuration(job.startedAt ??
-            job.createdAt, job.completedAt ?? null),
         duration: job.status === "completed" ||
             job.status === "failed" ||
             job.status === "cancelled"
@@ -165,6 +158,14 @@ export function enrichJob(job, options = {}) {
                 job.createdAt, job.completedAt ??
                 job.updatedAt)
             : null,
+        elapsed: formatElapsedDuration(job.startedAt ??
+            job.createdAt, job.completedAt ?? null),
+        kindLabel: getJobTypeLabel(job),
+        progressPreview: job.status === "queued" ||
+            job.status === "running" ||
+            job.status === "failed"
+            ? readJobProgressPreview(job.logFile, maxProgressLines)
+            : [],
     };
     return {
         ...enriched,
@@ -217,13 +218,13 @@ export function buildStatusSnapshot(cwd, options = {}) {
         job.id !== latestFinished?.id)
         .map((job) => enrichJob(job, { maxProgressLines }));
     return {
-        workspaceRoot,
         config,
-        sessionRuntime: getSessionRuntimeStatus(options.env, workspaceRoot),
-        running,
         latestFinished,
-        recent,
         needsReview: Boolean(config.stopReviewGate),
+        recent,
+        running,
+        sessionRuntime: getSessionRuntimeStatus(options.env, workspaceRoot),
+        workspaceRoot,
     };
 }
 export function buildSingleJobSnapshot(cwd, reference, options = {}) {
@@ -234,8 +235,8 @@ export function buildSingleJobSnapshot(cwd, reference, options = {}) {
         throw new Error(`No job found for "${reference}". Run /agent:status to inspect known jobs.`);
     }
     return {
-        workspaceRoot,
         job: enrichJob(selected, { maxProgressLines: options.maxProgressLines }),
+        workspaceRoot,
     };
 }
 export function resolveResultJob(cwd, reference) {
@@ -247,11 +248,11 @@ export function resolveResultJob(cwd, reference) {
         job.status === "failed" ||
         job.status === "cancelled");
     if (selected) {
-        return { workspaceRoot, job: selected };
+        return { job: selected, workspaceRoot };
     }
     const active = matchJobReference(jobs, reference, (job) => job.status === "queued" || job.status === "running");
     if (active) {
-        throw new Error(`Job ${active.id} is still ${active.status}. Check /agent:status and try again once it finishes.`);
+        throw new Error(`Job ${active.id} is still ${coerceString(active.status, "unknown")}. Check /agent:status and try again once it finishes.`);
     }
     if (reference) {
         throw new Error(`No finished job found for "${reference}". Run /agent:status to inspect active jobs.`);
@@ -267,11 +268,11 @@ export function resolveCancelableJob(cwd, reference, options = {}) {
         if (!selected) {
             throw new Error(`No active job found for "${reference}".`);
         }
-        return { workspaceRoot, job: selected };
+        return { job: selected, workspaceRoot };
     }
     const sessionScopedActiveJobs = filterJobsForCurrentSession(activeJobs, options);
     if (sessionScopedActiveJobs.length === 1) {
-        return { workspaceRoot, job: sessionScopedActiveJobs[0] };
+        return { job: sessionScopedActiveJobs[0], workspaceRoot };
     }
     if (sessionScopedActiveJobs.length > 1) {
         throw new Error("Multiple Agent jobs are active. Pass a job id to /agent:cancel.");

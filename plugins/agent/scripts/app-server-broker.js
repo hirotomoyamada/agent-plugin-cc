@@ -6,9 +6,9 @@ import { AgentAppServerClient, BROKER_BUSY_RPC_CODE } from "./lib/app-server.js"
 import { parseArgs } from "./lib/args.js";
 import { parseBrokerEndpoint } from "./lib/broker-endpoint.js";
 const STREAMING_METHODS = new Set([
-    "turn/start",
     "review/start",
     "thread/compact/start",
+    "turn/start",
 ]);
 function buildStreamThreadIds(method, params, result) {
     const threadIds = new Set();
@@ -21,7 +21,7 @@ function buildStreamThreadIds(method, params, result) {
     return threadIds;
 }
 function buildJsonRpcError(code, message, data) {
-    return data === undefined ? { code, message } : { code, message, data };
+    return data === undefined ? { code, message } : { code, data, message };
 }
 function send(socket, message) {
     if (socket.destroyed) {
@@ -128,8 +128,8 @@ async function main() {
                 }
                 catch (error) {
                     send(socket, {
-                        id: null,
                         error: buildJsonRpcError(-32700, `Invalid JSON: ${error.message}`),
+                        id: null,
                     });
                     continue;
                 }
@@ -161,8 +161,8 @@ async function main() {
                     (activeStreamSocket && activeStreamSocket !== socket)) &&
                     !allowInterruptDuringActiveStream) {
                     send(socket, {
-                        id: message.id,
                         error: buildJsonRpcError(BROKER_BUSY_RPC_CODE, "Shared Agent broker is busy."),
+                        id: message.id,
                     });
                     continue;
                 }
@@ -173,8 +173,8 @@ async function main() {
                     }
                     catch (error) {
                         send(socket, {
-                            id: message.id,
                             error: buildJsonRpcError(error.rpcCode ?? -32000, error.message),
+                            id: message.id,
                         });
                     }
                     continue;
@@ -194,8 +194,8 @@ async function main() {
                 }
                 catch (error) {
                     send(socket, {
-                        id: message.id,
                         error: buildJsonRpcError(error.rpcCode ?? -32000, error.message),
+                        id: message.id,
                     });
                     if (activeRequestSocket === socket) {
                         activeRequestSocket = null;

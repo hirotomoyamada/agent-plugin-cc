@@ -15,13 +15,15 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "tsgo",
-    "typecheck": "tsgo --noEmit",
+    "build": "tsgo -p tsconfig.agent.json && tsgo -p tsconfig.codex.json",
+    "build:agent": "tsgo -p tsconfig.agent.json",
+    "build:codex": "tsgo -p tsconfig.codex.json",
+    "typecheck": "tsgo -p tsconfig.agent.json --noEmit && tsgo -p tsconfig.codex.json --noEmit",
     "lint:check": "oxlint . --max-warnings=0",
     "lint:fix": "oxlint . --max-warnings=0 --fix",
     "format:check": "oxfmt --check .",
     "format:write": "oxfmt --write .",
-    "clean": "rimraf node_modules plugins/agent/scripts",
+    "clean": "rimraf node_modules plugins/agent/scripts plugins/codex/scripts",
     "prepare": "lefthook install"
   },
   "devDependencies": {

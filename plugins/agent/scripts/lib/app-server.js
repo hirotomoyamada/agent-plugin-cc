@@ -11,8 +11,8 @@ const PLUGIN_MANIFEST = JSON.parse(fs.readFileSync(PLUGIN_MANIFEST_URL, "utf8"))
 export const BROKER_ENDPOINT_ENV = "AGENT_COMPANION_APP_SERVER_ENDPOINT";
 export const BROKER_BUSY_RPC_CODE = -32001;
 const DEFAULT_CLIENT_INFO = {
-    title: "Agent Plugin",
     name: "Claude Code",
+    title: "Agent Plugin",
     version: PLUGIN_MANIFEST.version ?? "0.0.0",
 };
 const DEFAULT_CAPABILITIES = {
@@ -25,7 +25,7 @@ const DEFAULT_CAPABILITIES = {
     ],
 };
 function buildJsonRpcError(code, message, data) {
-    return data === undefined ? { code, message } : { code, message, data };
+    return data === undefined ? { code, message } : { code, data, message };
 }
 function createProtocolError(message, data) {
     const error = new Error(message);
@@ -76,7 +76,7 @@ class AppServerClientBase {
         const id = this.nextId;
         this.nextId += 1;
         return new Promise((resolve, reject) => {
-            this.pending.set(id, { resolve, reject, method });
+            this.pending.set(id, { method, reject, resolve });
             this.sendMessage({ id, method, params });
         });
     }
@@ -136,8 +136,8 @@ class AppServerClientBase {
     }
     handleServerRequest(message) {
         this.sendMessage({
-            id: message.id,
             error: buildJsonRpcError(-32601, `Unsupported server request: ${message.method}`),
+            id: message.id,
         });
     }
     handleExit(error) {
@@ -173,8 +173,8 @@ class SpawnedAgentAppServerClient extends AppServerClientBase {
         this.proc = spawn("agent", ["app-server"], {
             cwd: this.cwd,
             env: this.options.env ?? process.env,
-            stdio: ["pipe", "pipe", "pipe"],
             shell: process.platform === "win32" ? process.env.SHELL || true : false,
+            stdio: ["pipe", "pipe", "pipe"],
             windowsHide: true,
         });
         this.proc.stdout.setEncoding("utf8");
@@ -196,8 +196,8 @@ class SpawnedAgentAppServerClient extends AppServerClientBase {
             this.handleLine(line);
         });
         await this.request("initialize", {
-            clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
             capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES,
+            clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
         });
         this.notify("initialized", {});
     }
@@ -269,8 +269,8 @@ class BrokerAgentAppServerClient extends AppServerClientBase {
             });
         });
         await this.request("initialize", {
-            clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
             capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES,
+            clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
         });
         this.notify("initialized", {});
     }

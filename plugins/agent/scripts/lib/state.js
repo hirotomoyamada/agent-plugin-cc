@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { coerceString } from "./strings.js";
 import { resolveWorkspaceRoot } from "./workspace.js";
 const STATE_VERSION = 1;
 const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA";
@@ -14,11 +15,11 @@ function nowIso() {
 }
 function defaultState() {
     return {
-        version: STATE_VERSION,
         config: {
             stopReviewGate: false,
         },
         jobs: [],
+        version: STATE_VERSION,
     };
 }
 export function resolveStateDir(cwd) {
@@ -64,7 +65,7 @@ export function loadState(cwd) {
             ...parsed,
             config: {
                 ...defaultState().config,
-                ...(parsed.config ?? {}),
+                ...parsed.config,
             },
             jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
         };
@@ -75,7 +76,7 @@ export function loadState(cwd) {
 }
 function pruneJobs(jobs) {
     return [...jobs]
-        .sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")))
+        .sort((left, right) => coerceString(right.updatedAt).localeCompare(coerceString(left.updatedAt)))
         .slice(0, MAX_JOBS);
 }
 function removeFileIfExists(filePath) {
@@ -88,12 +89,12 @@ export function saveState(cwd, state) {
     ensureStateDir(cwd);
     const nextJobs = pruneJobs(state.jobs ?? []);
     const nextState = {
-        version: STATE_VERSION,
         config: {
             ...defaultState().config,
-            ...(state.config ?? {}),
+            ...state.config,
         },
         jobs: nextJobs,
+        version: STATE_VERSION,
     };
     const retainedIds = new Set(nextJobs.map((job) => job.id));
     for (const job of previousJobs) {

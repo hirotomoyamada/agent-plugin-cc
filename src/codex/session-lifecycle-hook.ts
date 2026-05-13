@@ -1,0 +1,138 @@
+import fs from "node:fs"
+import process from "node:process"
+
+import { BROKER_ENDPOINT_ENV } from "./lib/app-server.js"
+import {
+  clearBrokerSession,
+  loadBrokerSession,
+  LOG_FILE_ENV,
+  PID_FILE_ENV,
+  sendBrokerShutdown,
+  teardownBrokerSession,
+} from "./lib/broker-lifecycle.js"
+import { terminateProcessTree } from "./lib/process.js"
+import { loadState, resolveStateFile, saveState } from "./lib/state.js"
+import { resolveWorkspaceRoot } from "./lib/workspace.js"
+
+export const SESSION_ID_ENV = "CODEX_COMPANION_SESSION_ID"
+const PLUGIN_DATA_ENV = "CLAUDE_PLUGIN_DATA"
+
+function readHookInput(): Record<string, any> {
+  const raw = fs.readFileSync(0, "utf8").trim()
+  if (!raw) {
+    return {}
+  }
+  return JSON.parse(raw)
+}
+
+function shellEscape(value: string): string {
+  return `'${String(value).replace(/'/g, `'"'"'`)}'`
+}
+
+function appendEnvVar(name: string, value: null | string | undefined): void {
+  if (!process.env.CLAUDE_ENV_FILE || value == null || value === "") {
+    return
+  }
+  fs.appendFileSync(
+    process.env.CLAUDE_ENV_FILE,
+    `export ${name}=${shellEscape(value)}\n`,
+    "utf8",
+  )
+}
+
+function cleanupSessionJobs(
+  cwd: string,
+  sessionId: null | string | undefined,
+): void {
+  if (!cwd || !sessionId) {
+    return
+  }
+
+  const workspaceRoot = resolveWorkspaceRoot(cwd)
+  const stateFile = resolveStateFile(workspaceRoot)
+  if (!fs.existsSync(stateFile)) {
+    return
+  }
+
+  const state = loadState(workspaceRoot)
+  const removedJobs = state.jobs.filter((job) => job.sessionId === sessionId)
+  if (removedJobs.length === 0) {
+    return
+  }
+
+  for (const job of removedJobs) {
+    const stillRunning = job.status === "queued" || job.status === "running"
+    if (!stillRunning) {
+      continue
+    }
+    try {
+      terminateProcessTree((job.pid as number) ?? Number.NaN)
+    } catch {
+      // Ignore teardown failures during session shutdown.
+    }
+  }
+
+  saveState(workspaceRoot, {
+    ...state,
+    jobs: state.jobs.filter((job) => job.sessionId !== sessionId),
+  })
+}
+
+function handleSessionStart(input: Record<string, any>): void {
+  appendEnvVar(SESSION_ID_ENV, input.session_id)
+  appendEnvVar(PLUGIN_DATA_ENV, process.env[PLUGIN_DATA_ENV])
+}
+
+async function handleSessionEnd(input: Record<string, any>): Promise<void> {
+  const cwd = input.cwd || process.cwd()
+  const brokerSession =
+    loadBrokerSession(cwd) ??
+    (process.env[BROKER_ENDPOINT_ENV]
+      ? {
+          endpoint: process.env[BROKER_ENDPOINT_ENV],
+          logFile: process.env[LOG_FILE_ENV] ?? null,
+          pidFile: process.env[PID_FILE_ENV] ?? null,
+        }
+      : null)
+  const brokerEndpoint = brokerSession?.endpoint ?? null
+  const pidFile = brokerSession?.pidFile ?? null
+  const logFile = brokerSession?.logFile ?? null
+  const sessionDir = (brokerSession as any)?.sessionDir ?? null
+  const pid = (brokerSession as any)?.pid ?? null
+
+  if (brokerEndpoint) {
+    await sendBrokerShutdown(brokerEndpoint)
+  }
+
+  cleanupSessionJobs(cwd, input.session_id || process.env[SESSION_ID_ENV])
+  teardownBrokerSession({
+    endpoint: brokerEndpoint,
+    killProcess: terminateProcessTree,
+    logFile,
+    pid,
+    pidFile,
+    sessionDir,
+  })
+  clearBrokerSession(cwd)
+}
+
+async function main(): Promise<void> {
+  const input = readHookInput()
+  const eventName = process.argv[2] ?? input.hook_event_name ?? ""
+
+  if (eventName === "SessionStart") {
+    handleSessionStart(input)
+    return
+  }
+
+  if (eventName === "SessionEnd") {
+    await handleSessionEnd(input)
+  }
+}
+
+main().catch((error: unknown) => {
+  process.stderr.write(
+    `${error instanceof Error ? error.message : String(error)}\n`,
+  )
+  process.exit(1)
+})

@@ -5,8 +5,6 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ESNext"],
-    "outDir": "plugins/agent/scripts",
-    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,6 +14,7 @@
     "noUncheckedSideEffectImports": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
+    "noEmit": true,
     "types": ["node"]
   },
   "include": ["src"],

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "plugins/codex/scripts",
+    "rootDir": "src/codex"
+  },
+  "include": ["src/codex"],
+  "exclude": ["node_modules", "plugins"]
+}

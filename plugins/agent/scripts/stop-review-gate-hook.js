@@ -7,6 +7,7 @@ import { getAgentAvailability } from "./lib/agent.js";
 import { sortJobsNewestFirst } from "./lib/job-control.js";
 import { interpolateTemplate, loadPromptTemplate } from "./lib/prompts.js";
 import { getConfig, listJobs } from "./lib/state.js";
+import { coerceString } from "./lib/strings.js";
 import { SESSION_ID_ENV } from "./lib/tracked-jobs.js";
 import { resolveWorkspaceRoot } from "./lib/workspace.js";
 const STOP_REVIEW_TIMEOUT_MS = 15 * 60 * 1000;
@@ -55,7 +56,7 @@ function buildSetupNote(cwd) {
     return `Agent is not set up for the review gate.${detail} Run /agent:setup.`;
 }
 function parseStopReviewOutput(rawOutput) {
-    const text = String(rawOutput ?? "").trim();
+    const text = coerceString(rawOutput).trim();
     if (!text) {
         return {
             ok: false,
@@ -87,8 +88,8 @@ function runStopReview(cwd, input = {}) {
     };
     const result = spawnSync(process.execPath, [scriptPath, "task", "--json", prompt], {
         cwd,
-        env: childEnv,
         encoding: "utf8",
+        env: childEnv,
         timeout: STOP_REVIEW_TIMEOUT_MS,
     });
     if (result.error?.code === "ETIMEDOUT") {

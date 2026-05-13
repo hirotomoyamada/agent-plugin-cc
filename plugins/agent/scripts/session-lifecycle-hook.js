@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 import { BROKER_ENDPOINT_ENV } from "./lib/app-server.js";
-import { LOG_FILE_ENV, PID_FILE_ENV, clearBrokerSession, loadBrokerSession, sendBrokerShutdown, teardownBrokerSession, } from "./lib/broker-lifecycle.js";
+import { clearBrokerSession, loadBrokerSession, LOG_FILE_ENV, PID_FILE_ENV, sendBrokerShutdown, teardownBrokerSession, } from "./lib/broker-lifecycle.js";
 import { terminateProcessTree } from "./lib/process.js";
 import { loadState, resolveStateFile, saveState } from "./lib/state.js";
 import { resolveWorkspaceRoot } from "./lib/workspace.js";
@@ -15,7 +15,7 @@ function readHookInput() {
     return JSON.parse(raw);
 }
 function shellEscape(value) {
-    return `'${String(value).replace(/'/g, `'\"'\"'`)}'`;
+    return `'${String(value).replace(/'/g, `'"'"'`)}'`;
 }
 function appendEnvVar(name, value) {
     if (!process.env.CLAUDE_ENV_FILE || value == null || value === "") {
@@ -64,8 +64,8 @@ async function handleSessionEnd(input) {
         (process.env[BROKER_ENDPOINT_ENV]
             ? {
                 endpoint: process.env[BROKER_ENDPOINT_ENV],
-                pidFile: process.env[PID_FILE_ENV] ?? null,
                 logFile: process.env[LOG_FILE_ENV] ?? null,
+                pidFile: process.env[PID_FILE_ENV] ?? null,
             }
             : null);
     const brokerEndpoint = brokerSession?.endpoint ?? null;
@@ -79,11 +79,11 @@ async function handleSessionEnd(input) {
     cleanupSessionJobs(cwd, input.session_id || process.env[SESSION_ID_ENV]);
     teardownBrokerSession({
         endpoint: brokerEndpoint,
-        pidFile,
-        logFile,
-        sessionDir,
-        pid,
         killProcess: terminateProcessTree,
+        logFile,
+        pid,
+        pidFile,
+        sessionDir,
     });
     clearBrokerSession(cwd);
 }

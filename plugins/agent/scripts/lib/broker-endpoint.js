@@ -1,9 +1,7 @@
 import path from "node:path";
 import process from "node:process";
 function sanitizePipeName(value) {
-    return String(value ?? "")
-        .replace(/[^A-Za-z0-9._-]/g, "-")
-        .replace(/^-+|-+$/g, "");
+    return value.replace(/[^A-Za-z0-9._-]/g, "-").replace(/^-+|-+$/g, "");
 }
 export function createBrokerEndpoint(sessionDir, platform = process.platform) {
     if (platform === "win32") {

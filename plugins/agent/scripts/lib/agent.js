@@ -17,26 +17,26 @@ function cleanAgentStderr(stderr) {
 }
 function buildThreadParams(cwd, options = {}) {
     return {
-        cwd,
-        model: options.model ?? null,
         approvalPolicy: options.approvalPolicy ?? "never",
-        sandbox: options.sandbox ?? "read-only",
-        serviceName: SERVICE_NAME,
+        cwd,
         ephemeral: options.ephemeral ?? true,
         experimentalRawEvents: false,
+        model: options.model ?? null,
+        sandbox: options.sandbox ?? "read-only",
+        serviceName: SERVICE_NAME,
     };
 }
 function buildResumeParams(threadId, cwd, options = {}) {
     return {
-        threadId,
+        approvalPolicy: options.approvalPolicy ?? "never",
         cwd,
         model: options.model ?? null,
-        approvalPolicy: options.approvalPolicy ?? "never",
         sandbox: options.sandbox ?? "read-only",
+        threadId,
     };
 }
 function _buildTurnInput(prompt) {
-    return [{ type: "text", text: prompt, text_elements: [] }];
+    return [{ text: prompt, text_elements: [], type: "text" }];
 }
 function shorten(text, limit = 72) {
     const normalized = String(text ?? "")
@@ -138,11 +138,11 @@ function emitLogEvent(onProgress, options = {}) {
         return;
     }
     onProgress({
+        logBody: options.logBody ?? null,
+        logTitle: options.logTitle ?? null,
         message: options.message ?? "",
         phase: options.phase ?? null,
         stderrMessage: options.stderrMessage ?? null,
-        logTitle: options.logTitle ?? null,
-        logBody: options.logBody ?? null,
     });
 }
 function labelForThread(state, threadId) {
@@ -258,30 +258,30 @@ function createTurnCaptureState(threadId, options = {}) {
         rejectCompletion = reject;
     });
     return {
-        threadId,
-        rootThreadId: threadId,
-        threadIds: new Set([threadId]),
-        threadTurnIds: new Map(),
-        threadLabels: new Map(),
-        turnId: null,
-        bufferedNotifications: [],
-        completion,
-        resolveCompletion,
-        rejectCompletion,
-        finalTurn: null,
-        completed: false,
-        finalAnswerSeen: false,
-        pendingCollaborations: new Set(),
         activeSubagentTurns: new Set(),
-        completionTimer: null,
-        lastAgentMessage: "",
-        reviewText: "",
-        reasoningSummary: [],
-        error: null,
-        messages: [],
-        fileChanges: [],
+        bufferedNotifications: [],
         commandExecutions: [],
+        completed: false,
+        completion,
+        completionTimer: null,
+        error: null,
+        fileChanges: [],
+        finalAnswerSeen: false,
+        finalTurn: null,
+        lastAgentMessage: "",
+        messages: [],
         onProgress: options.onProgress ?? null,
+        pendingCollaborations: new Set(),
+        reasoningSummary: [],
+        rejectCompletion,
+        resolveCompletion,
+        reviewText: "",
+        rootThreadId: threadId,
+        threadId,
+        threadIds: new Set([threadId]),
+        threadLabels: new Map(),
+        threadTurnIds: new Map(),
+        turnId: null,
     };
 }
 function clearCompletionTimer(state) {
@@ -378,15 +378,15 @@ function recordItem(state, item, lifecycle, threadId = null) {
             if (lifecycle === "completed") {
                 const sourceLabel = labelForThread(state, threadId);
                 emitLogEvent(state.onProgress, {
-                    message: sourceLabel
-                        ? `Subagent ${sourceLabel}: ${shorten(item.text, 96)}`
-                        : `Assistant message captured: ${shorten(item.text, 96)}`,
-                    stderrMessage: null,
-                    phase: item.phase === "final_answer" ? "finalizing" : null,
+                    logBody: item.text,
                     logTitle: sourceLabel
                         ? `Subagent ${sourceLabel} message`
                         : "Assistant message",
-                    logBody: item.text,
+                    message: sourceLabel
+                        ? `Subagent ${sourceLabel}: ${shorten(item.text, 96)}`
+                        : `Assistant message captured: ${shorten(item.text, 96)}`,
+                    phase: item.phase === "final_answer" ? "finalizing" : null,
+                    stderrMessage: null,
                 });
             }
         }
@@ -396,11 +396,11 @@ function recordItem(state, item, lifecycle, threadId = null) {
         state.reviewText = item.review ?? "";
         if (lifecycle === "completed" && item.review) {
             emitLogEvent(state.onProgress, {
-                message: "Review output captured.",
-                stderrMessage: null,
-                phase: "finalizing",
-                logTitle: "Review output",
                 logBody: item.review,
+                logTitle: "Review output",
+                message: "Review output captured.",
+                phase: "finalizing",
+                stderrMessage: null,
             });
         }
         return;
@@ -411,16 +411,16 @@ function recordItem(state, item, lifecycle, threadId = null) {
         if (nextSections.length > 0) {
             const sourceLabel = labelForThread(state, threadId);
             emitLogEvent(state.onProgress, {
+                logBody: nextSections
+                    .map((section) => `- ${section}`)
+                    .join("\n"),
+                logTitle: sourceLabel
+                    ? `Subagent ${sourceLabel} reasoning summary`
+                    : "Reasoning summary",
                 message: sourceLabel
                     ? `Subagent ${sourceLabel} reasoning: ${shorten(nextSections[0], 96)}`
                     : `Reasoning summary captured: ${shorten(nextSections[0], 96)}`,
                 stderrMessage: null,
-                logTitle: sourceLabel
-                    ? `Subagent ${sourceLabel} reasoning summary`
-                    : "Reasoning summary",
-                logBody: nextSections
-                    .map((section) => `- ${section}`)
-                    .join("\n"),
             });
         }
         return;
@@ -437,10 +437,10 @@ function applyTurnNotification(state, message) {
     switch (message.method) {
         case "thread/started":
             registerThread(state, message.params.thread.id, {
-                threadName: message.params.thread.name,
-                name: message.params.thread.name,
                 agentNickname: message.params.thread.agentNickname,
                 agentRole: message.params.thread.agentRole,
+                name: message.params.thread.name,
+                threadName: message.params.thread.name,
             });
             break;
         case "thread/name/updated":
@@ -580,8 +580,8 @@ async function _startThread(client, cwd, options = {}) {
     if (options.threadName) {
         try {
             await client.request("thread/name/set", {
-                threadId,
                 name: options.threadName,
+                threadId,
             });
         }
         catch (err) {
@@ -601,13 +601,13 @@ function _buildResultStatus(turnState) {
 }
 function buildAuthStatus(fields = {}) {
     return {
-        available: true,
-        loggedIn: false,
-        detail: "not authenticated",
-        source: "unknown",
         authMethod: null,
-        verified: null,
+        available: true,
+        detail: "not authenticated",
+        loggedIn: false,
         provider: null,
+        source: "unknown",
+        verified: null,
         ...fields,
     };
 }
@@ -617,8 +617,8 @@ async function _getAgentAuthStatusFromClient(client, cwd) {
             refreshToken: false,
         });
         const _configResponse = await client.request("config/read", {
-            includeLayers: false,
             cwd,
+            includeLayers: false,
         });
         const account = accountResponse?.account ?? null;
         if (account) {
@@ -626,23 +626,23 @@ async function _getAgentAuthStatusFromClient(client, cwd) {
                 ? account.email.trim()
                 : null;
             return buildAuthStatus({
-                loggedIn: true,
-                detail: email ? `Login active for ${email}` : "Login active",
-                source: "app-server",
                 authMethod: account.type ?? "unknown",
+                detail: email ? `Login active for ${email}` : "Login active",
+                loggedIn: true,
+                source: "app-server",
                 verified: true,
             });
         }
         return buildAuthStatus({
-            loggedIn: false,
             detail: "Not authenticated",
+            loggedIn: false,
             source: "app-server",
         });
     }
     catch (error) {
         return buildAuthStatus({
-            loggedIn: false,
             detail: error instanceof Error ? error.message : String(error),
+            loggedIn: false,
             source: "app-server",
         });
     }
@@ -663,38 +663,38 @@ export function getSessionRuntimeStatus(env = process.env, cwd = process.cwd()) 
     const endpoint = env?.[BROKER_ENDPOINT_ENV] ?? loadBrokerSession(cwd)?.endpoint ?? null;
     if (endpoint) {
         return {
-            mode: "shared",
-            label: "shared session",
             detail: "This Claude session is configured to reuse one shared Agent runtime.",
             endpoint,
+            label: "shared session",
+            mode: "shared",
         };
     }
     return {
-        mode: "direct",
-        label: "direct startup",
         detail: "No shared Agent runtime is active yet. The first review or task command will start one on demand.",
         endpoint: null,
+        label: "direct startup",
+        mode: "direct",
     };
 }
 export async function getAgentAuthStatus(cwd, _options = {}) {
     const availability = getAgentAvailability(cwd);
     if (!availability.available) {
         return {
-            available: false,
-            loggedIn: false,
-            detail: availability.detail,
-            source: "availability",
             authMethod: null,
-            verified: null,
+            available: false,
+            detail: availability.detail,
+            loggedIn: false,
             provider: null,
+            source: "availability",
+            verified: null,
         };
     }
     try {
         const result = runCommand("agent", ["status", "--format", "json"], { cwd });
         if (result.status !== 0) {
             return buildAuthStatus({
-                loggedIn: false,
                 detail: result.stderr.trim() || `agent status exited with ${result.status}`,
+                loggedIn: false,
                 source: "agent-status",
             });
         }
@@ -702,23 +702,23 @@ export async function getAgentAuthStatus(cwd, _options = {}) {
         if (parsed.isAuthenticated) {
             const email = parsed.userInfo?.email ?? null;
             return buildAuthStatus({
-                loggedIn: true,
-                detail: email ? `Login active for ${email}` : "Login active",
-                source: "agent-status",
                 authMethod: "cursor-login",
+                detail: email ? `Login active for ${email}` : "Login active",
+                loggedIn: true,
+                source: "agent-status",
                 verified: true,
             });
         }
         return buildAuthStatus({
-            loggedIn: false,
             detail: "Not authenticated",
+            loggedIn: false,
             source: "agent-status",
         });
     }
     catch (error) {
         return buildAuthStatus({
-            loggedIn: false,
             detail: error instanceof Error ? error.message : String(error),
+            loggedIn: false,
             source: "agent-status",
         });
     }
@@ -727,18 +727,18 @@ export async function interruptAppServerTurn(cwd, { threadId, turnId }) {
     if (!threadId || !turnId) {
         return {
             attempted: false,
+            detail: "missing threadId or turnId",
             interrupted: false,
             transport: null,
-            detail: "missing threadId or turnId",
         };
     }
     const availability = getAgentAvailability(cwd);
     if (!availability.available) {
         return {
             attempted: false,
+            detail: availability.detail,
             interrupted: false,
             transport: null,
-            detail: availability.detail,
         };
     }
     let client = null;
@@ -749,17 +749,17 @@ export async function interruptAppServerTurn(cwd, { threadId, turnId }) {
         await client.request("turn/interrupt", { threadId, turnId });
         return {
             attempted: true,
+            detail: `Interrupted ${turnId} on ${threadId}.`,
             interrupted: true,
             transport: client.transport,
-            detail: `Interrupted ${turnId} on ${threadId}.`,
         };
     }
     catch (error) {
         return {
             attempted: true,
+            detail: error instanceof Error ? error.message : String(error),
             interrupted: false,
             transport: client?.transport ?? null,
-            detail: error instanceof Error ? error.message : String(error),
         };
     }
     finally {
@@ -778,8 +778,8 @@ async function runAgentPrintMode(cwd, prompt, options = {}) {
         const proc = spawn("agent", args, {
             cwd,
             env: process.env,
-            stdio: ["pipe", "pipe", "pipe"],
             shell: false,
+            stdio: ["pipe", "pipe", "pipe"],
         });
         let stdout = "";
         let stderr = "";
@@ -805,23 +805,23 @@ async function runAgentPrintMode(cwd, prompt, options = {}) {
                 const result = JSON.parse(stdout.trim());
                 emitProgress(options.onProgress, `Agent task ${result.is_error ? "failed" : "completed"}.`, "finalizing");
                 resolve({
-                    status: result.is_error ? 1 : 0,
-                    threadId: result.session_id ?? "print-mode",
-                    turnId: result.request_id ?? null,
+                    commandExecutions: [],
+                    error: result.is_error ? { message: result.result } : null,
+                    fileChanges: [],
                     finalMessage: result.result ?? "",
                     reasoningSummary: [],
+                    status: result.is_error ? 1 : 0,
+                    stderr: cleanedStderr,
+                    threadId: result.session_id ?? "print-mode",
+                    touchedFiles: [],
                     turn: {
                         id: result.request_id ?? "print-mode",
                         status: result.is_error ? "failed" : "completed",
                     },
-                    error: result.is_error ? { message: result.result } : null,
-                    stderr: cleanedStderr,
-                    fileChanges: [],
-                    touchedFiles: [],
-                    commandExecutions: [],
+                    turnId: result.request_id ?? null,
                 });
             }
-            catch (_e) {
+            catch {
                 const stderrDetail = cleanedStderr ? ` | stderr: ${cleanedStderr}` : "";
                 const stdoutDetail = stdout.trim()
                     ? ` | stdout: ${stdout.slice(0, 200)}`
@@ -839,19 +839,19 @@ export async function runAppServerReview(cwd, options = {}) {
     emitProgress(options.onProgress, "Starting Agent review (print mode).", "starting");
     const turnResult = await runAgentPrintMode(cwd, "Review the current changes in detail. Provide a thorough code review.", {
         model: options.model,
-        sandbox: "read-only",
         onProgress: options.onProgress,
+        sandbox: "read-only",
     });
     return {
-        status: turnResult.status,
-        threadId: turnResult.threadId,
-        sourceThreadId: turnResult.threadId,
-        turnId: turnResult.turnId,
-        reviewText: turnResult.finalMessage,
-        reasoningSummary: turnResult.reasoningSummary,
-        turn: turnResult.turn,
         error: turnResult.error,
+        reasoningSummary: turnResult.reasoningSummary,
+        reviewText: turnResult.finalMessage,
+        sourceThreadId: turnResult.threadId,
+        status: turnResult.status,
         stderr: turnResult.stderr,
+        threadId: turnResult.threadId,
+        turn: turnResult.turn,
+        turnId: turnResult.turnId,
     };
 }
 export async function runAppServerTurn(cwd, options = {}) {
@@ -866,8 +866,8 @@ export async function runAppServerTurn(cwd, options = {}) {
     emitProgress(options.onProgress, "Starting Agent task (print mode).", "starting");
     return runAgentPrintMode(cwd, prompt, {
         model: options.model,
-        sandbox: options.sandbox,
         onProgress: options.onProgress,
+        sandbox: options.sandbox,
     });
 }
 export async function findLatestTaskThread(cwd) {
@@ -879,9 +879,9 @@ export async function findLatestTaskThread(cwd) {
         const response = await client.request("thread/list", {
             cwd,
             limit: 20,
+            searchTerm: TASK_THREAD_PREFIX,
             sortKey: "updated_at",
             sourceKinds: ["appServer"],
-            searchTerm: TASK_THREAD_PREFIX,
         });
         return (response.data.find((thread) => typeof thread.name === "string" &&
             thread.name.startsWith(TASK_THREAD_PREFIX)) ?? null);
