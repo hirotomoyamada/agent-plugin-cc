@@ -23,7 +23,8 @@ export function parseArgs(argv, config = {}) {
             const [rawKey, inlineValue] = token.slice(2).split("=", 2);
             const key = aliasMap[rawKey] ?? rawKey;
             if (booleanOptions.has(key)) {
-                options[key] = inlineValue === undefined ? true : inlineValue !== "false";
+                options[key] =
+                    inlineValue === undefined ? true : inlineValue !== "false";
                 continue;
             }
             if (valueOptions.has(key)) {

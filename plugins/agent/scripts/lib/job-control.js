@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 import { getSessionRuntimeStatus } from "./agent.js";
-import { getConfig, listJobs, readJobFile, resolveJobFile } from "./state.js";
+import { getConfig, listJobs, readJobFile, resolveJobFile, } from "./state.js";
 import { SESSION_ID_ENV } from "./tracked-jobs.js";
 import { resolveWorkspaceRoot } from "./workspace.js";
 export const DEFAULT_MAX_STATUS_JOBS = 8;
@@ -10,7 +10,9 @@ export function sortJobsNewestFirst(jobs) {
     return [...jobs].sort((left, right) => String(right.updatedAt ?? "").localeCompare(String(left.updatedAt ?? "")));
 }
 function getCurrentSessionId(options = {}) {
-    return options.env?.[SESSION_ID_ENV] ?? process.env[SESSION_ID_ENV] ?? null;
+    return (options.env?.[SESSION_ID_ENV] ??
+        process.env[SESSION_ID_ENV] ??
+        null);
 }
 function filterJobsForCurrentSession(jobs, options = {}) {
     const sessionId = getCurrentSessionId(options);
@@ -44,7 +46,12 @@ function stripLogPrefix(line) {
     return line.replace(/^\[[^\]]+\]\s*/, "").trim();
 }
 function isProgressBlockTitle(line) {
-    return (["Final output", "Assistant message", "Reasoning summary", "Review output"].includes(line) ||
+    return ([
+        "Final output",
+        "Assistant message",
+        "Reasoning summary",
+        "Review output",
+    ].includes(line) ||
         /^Subagent .+ message$/.test(line) ||
         /^Subagent .+ reasoning summary$/.test(line));
 }
@@ -101,13 +108,17 @@ function inferLegacyJobPhase(job, progressPreview = []) {
     }
     for (let index = progressPreview.length - 1; index >= 0; index -= 1) {
         const line = progressPreview[index].toLowerCase();
-        if (line.startsWith("starting agent") || line.startsWith("thread ready") || line.startsWith("turn started")) {
+        if (line.startsWith("starting agent") ||
+            line.startsWith("thread ready") ||
+            line.startsWith("turn started")) {
             return "starting";
         }
         if (line.startsWith("reviewer started") || line.includes("review mode")) {
             return "reviewing";
         }
-        if (line.startsWith("searching:") || line.startsWith("calling ") || line.startsWith("running tool:")) {
+        if (line.startsWith("searching:") ||
+            line.startsWith("calling ") ||
+            line.startsWith("running tool:")) {
             return "investigating";
         }
         if (line.startsWith("starting collaboration tool:")) {
@@ -140,17 +151,25 @@ export function enrichJob(job, options = {}) {
     const enriched = {
         ...job,
         kindLabel: getJobTypeLabel(job),
-        progressPreview: job.status === "queued" || job.status === "running" || job.status === "failed"
+        progressPreview: job.status === "queued" ||
+            job.status === "running" ||
+            job.status === "failed"
             ? readJobProgressPreview(job.logFile, maxProgressLines)
             : [],
-        elapsed: formatElapsedDuration(job.startedAt ?? job.createdAt, job.completedAt ?? null),
-        duration: job.status === "completed" || job.status === "failed" || job.status === "cancelled"
-            ? formatElapsedDuration(job.startedAt ?? job.createdAt, job.completedAt ?? job.updatedAt)
-            : null
+        elapsed: formatElapsedDuration(job.startedAt ??
+            job.createdAt, job.completedAt ?? null),
+        duration: job.status === "completed" ||
+            job.status === "failed" ||
+            job.status === "cancelled"
+            ? formatElapsedDuration(job.startedAt ??
+                job.createdAt, job.completedAt ??
+                job.updatedAt)
+            : null,
     };
     return {
         ...enriched,
-        phase: enriched.phase ?? inferLegacyJobPhase(enriched, enriched.progressPreview)
+        phase: enriched.phase ??
+            inferLegacyJobPhase(enriched, enriched.progressPreview),
     };
 }
 export function readStoredJob(workspaceRoot, jobId) {
@@ -187,10 +206,15 @@ export function buildStatusSnapshot(cwd, options = {}) {
     const running = jobs
         .filter((job) => job.status === "queued" || job.status === "running")
         .map((job) => enrichJob(job, { maxProgressLines }));
-    const latestFinishedRaw = jobs.find((job) => job.status !== "queued" && job.status !== "running") ?? null;
-    const latestFinished = latestFinishedRaw ? enrichJob(latestFinishedRaw, { maxProgressLines }) : null;
+    const latestFinishedRaw = jobs.find((job) => job.status !== "queued" && job.status !== "running") ??
+        null;
+    const latestFinished = latestFinishedRaw
+        ? enrichJob(latestFinishedRaw, { maxProgressLines })
+        : null;
     const recent = (options.all ? jobs : jobs.slice(0, maxJobs))
-        .filter((job) => job.status !== "queued" && job.status !== "running" && job.id !== latestFinished?.id)
+        .filter((job) => job.status !== "queued" &&
+        job.status !== "running" &&
+        job.id !== latestFinished?.id)
         .map((job) => enrichJob(job, { maxProgressLines }));
     return {
         workspaceRoot,
@@ -199,7 +223,7 @@ export function buildStatusSnapshot(cwd, options = {}) {
         running,
         latestFinished,
         recent,
-        needsReview: Boolean(config.stopReviewGate)
+        needsReview: Boolean(config.stopReviewGate),
     };
 }
 export function buildSingleJobSnapshot(cwd, reference, options = {}) {
@@ -211,13 +235,17 @@ export function buildSingleJobSnapshot(cwd, reference, options = {}) {
     }
     return {
         workspaceRoot,
-        job: enrichJob(selected, { maxProgressLines: options.maxProgressLines })
+        job: enrichJob(selected, { maxProgressLines: options.maxProgressLines }),
     };
 }
 export function resolveResultJob(cwd, reference) {
     const workspaceRoot = resolveWorkspaceRoot(cwd);
-    const jobs = sortJobsNewestFirst(reference ? listJobs(workspaceRoot) : filterJobsForCurrentSession(listJobs(workspaceRoot)));
-    const selected = matchJobReference(jobs, reference, (job) => job.status === "completed" || job.status === "failed" || job.status === "cancelled");
+    const jobs = sortJobsNewestFirst(reference
+        ? listJobs(workspaceRoot)
+        : filterJobsForCurrentSession(listJobs(workspaceRoot)));
+    const selected = matchJobReference(jobs, reference, (job) => job.status === "completed" ||
+        job.status === "failed" ||
+        job.status === "cancelled");
     if (selected) {
         return { workspaceRoot, job: selected };
     }

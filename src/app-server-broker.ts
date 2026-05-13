@@ -1,103 +1,121 @@
-import fs from "node:fs";
-import net from "node:net";
-import path from "node:path";
-import process from "node:process";
+import fs from "node:fs"
+import net from "node:net"
+import path from "node:path"
+import process from "node:process"
 
-import { AgentAppServerClient, BROKER_BUSY_RPC_CODE } from "./lib/app-server.js";
-import { parseArgs } from "./lib/args.js";
-import { parseBrokerEndpoint } from "./lib/broker-endpoint.js";
+import { AgentAppServerClient, BROKER_BUSY_RPC_CODE } from "./lib/app-server.js"
+import { parseArgs } from "./lib/args.js"
+import { parseBrokerEndpoint } from "./lib/broker-endpoint.js"
 
-const STREAMING_METHODS = new Set(["turn/start", "review/start", "thread/compact/start"]);
+const STREAMING_METHODS = new Set([
+  "review/start",
+  "thread/compact/start",
+  "turn/start",
+])
 
-function buildStreamThreadIds(method: string, params: any, result: any): Set<string> {
-  const threadIds = new Set<string>();
+function buildStreamThreadIds(
+  method: string,
+  params: any,
+  result: any,
+): Set<string> {
+  const threadIds = new Set<string>()
   if (params?.threadId) {
-    threadIds.add(params.threadId);
+    threadIds.add(params.threadId)
   }
   if (method === "review/start" && result?.reviewThreadId) {
-    threadIds.add(result.reviewThreadId);
+    threadIds.add(result.reviewThreadId)
   }
-  return threadIds;
+  return threadIds
 }
 
 function buildJsonRpcError(
   code: number,
   message: string,
-  data?: unknown
-): { code: number; message: string; data?: unknown } {
-  return data === undefined ? { code, message } : { code, message, data };
+  data?: unknown,
+): { code: number; data?: unknown; message: string } {
+  return data === undefined ? { code, message } : { code, data, message }
 }
 
 function send(socket: net.Socket, message: unknown): void {
   if (socket.destroyed) {
-    return;
+    return
   }
-  socket.write(`${JSON.stringify(message)}\n`);
+  socket.write(`${JSON.stringify(message)}\n`)
 }
 
 function isInterruptRequest(message: any): boolean {
-  return message?.method === "turn/interrupt";
+  return message?.method === "turn/interrupt"
 }
 
-function writePidFile(pidFile: string | null): void {
+function writePidFile(pidFile: null | string): void {
   if (!pidFile) {
-    return;
+    return
   }
-  fs.mkdirSync(path.dirname(pidFile), { recursive: true });
-  fs.writeFileSync(pidFile, `${process.pid}\n`, "utf8");
+  fs.mkdirSync(path.dirname(pidFile), { recursive: true })
+  fs.writeFileSync(pidFile, `${process.pid}\n`, "utf8")
 }
 
 async function main(): Promise<void> {
-  const [subcommand, ...argv] = process.argv.slice(2);
+  const [subcommand, ...argv] = process.argv.slice(2)
   if (subcommand !== "serve") {
     throw new Error(
-      "Usage: node dist/app-server-broker.js serve --endpoint <value> [--cwd <path>] [--pid-file <path>]"
-    );
+      "Usage: node dist/app-server-broker.js serve --endpoint <value> [--cwd <path>] [--pid-file <path>]",
+    )
   }
 
   const { options } = parseArgs(argv, {
-    valueOptions: ["cwd", "pid-file", "endpoint"]
-  });
+    valueOptions: ["cwd", "pid-file", "endpoint"],
+  })
 
   if (!options.endpoint) {
-    throw new Error("Missing required --endpoint.");
+    throw new Error("Missing required --endpoint.")
   }
 
-  const cwd = options.cwd ? path.resolve(process.cwd(), String(options.cwd)) : process.cwd();
-  const endpoint = String(options.endpoint);
-  const listenTarget = parseBrokerEndpoint(endpoint);
-  const pidFile = options["pid-file"] ? path.resolve(String(options["pid-file"])) : null;
-  writePidFile(pidFile);
+  const cwd = options.cwd
+    ? path.resolve(process.cwd(), String(options.cwd))
+    : process.cwd()
+  const endpoint = String(options.endpoint)
+  const listenTarget = parseBrokerEndpoint(endpoint)
+  const pidFile = options["pid-file"]
+    ? path.resolve(String(options["pid-file"]))
+    : null
+  writePidFile(pidFile)
 
-  const appClient = await AgentAppServerClient.connect(cwd, { disableBroker: true });
-  let activeRequestSocket: net.Socket | null = null;
-  let activeStreamSocket: net.Socket | null = null;
-  let activeStreamThreadIds: Set<string> | null = null;
-  const sockets = new Set<net.Socket>();
+  const appClient = await AgentAppServerClient.connect(cwd, {
+    disableBroker: true,
+  })
+  let activeRequestSocket: net.Socket | null = null
+  let activeStreamSocket: net.Socket | null = null
+  let activeStreamThreadIds: null | Set<string> = null
+  const sockets = new Set<net.Socket>()
 
   function clearSocketOwnership(socket: net.Socket): void {
     if (activeRequestSocket === socket) {
-      activeRequestSocket = null;
+      activeRequestSocket = null
     }
     if (activeStreamSocket === socket) {
-      activeStreamSocket = null;
-      activeStreamThreadIds = null;
+      activeStreamSocket = null
+      activeStreamThreadIds = null
     }
   }
 
   function routeNotification(message: any): void {
-    const target = activeRequestSocket ?? activeStreamSocket;
+    const target = activeRequestSocket ?? activeStreamSocket
     if (!target) {
-      return;
+      return
     }
-    send(target, message);
+    send(target, message)
     if (message.method === "turn/completed" && activeStreamSocket === target) {
-      const threadId = message.params?.threadId ?? null;
-      if (!threadId || !activeStreamThreadIds || activeStreamThreadIds.has(threadId)) {
-        activeStreamSocket = null;
-        activeStreamThreadIds = null;
+      const threadId = message.params?.threadId ?? null
+      if (
+        !threadId ||
+        !activeStreamThreadIds ||
+        activeStreamThreadIds.has(threadId)
+      ) {
+        activeStreamSocket = null
+        activeStreamThreadIds = null
         if (activeRequestSocket === target) {
-          activeRequestSocket = null;
+          activeRequestSocket = null
         }
       }
     }
@@ -105,74 +123,80 @@ async function main(): Promise<void> {
 
   async function shutdown(server: net.Server): Promise<void> {
     for (const socket of sockets) {
-      socket.end();
+      socket.end()
     }
-    await appClient.close().catch(() => {});
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await appClient.close().catch(() => {})
+    await new Promise<void>((resolve) => server.close(() => resolve()))
     if (listenTarget.kind === "unix" && fs.existsSync(listenTarget.path)) {
-      fs.unlinkSync(listenTarget.path);
+      fs.unlinkSync(listenTarget.path)
     }
     if (pidFile && fs.existsSync(pidFile)) {
-      fs.unlinkSync(pidFile);
+      fs.unlinkSync(pidFile)
     }
   }
 
-  appClient.setNotificationHandler(routeNotification);
+  appClient.setNotificationHandler(routeNotification)
 
   const server = net.createServer((socket) => {
-    sockets.add(socket);
-    socket.setEncoding("utf8");
-    let buffer = "";
+    sockets.add(socket)
+    socket.setEncoding("utf8")
+    let buffer = ""
 
     socket.on("data", async (chunk) => {
-      buffer += chunk;
-      let newlineIndex = buffer.indexOf("\n");
+      buffer += chunk
+      let newlineIndex = buffer.indexOf("\n")
       while (newlineIndex !== -1) {
-        const line = buffer.slice(0, newlineIndex);
-        buffer = buffer.slice(newlineIndex + 1);
-        newlineIndex = buffer.indexOf("\n");
+        const line = buffer.slice(0, newlineIndex)
+        buffer = buffer.slice(newlineIndex + 1)
+        newlineIndex = buffer.indexOf("\n")
 
         if (!line.trim()) {
-          continue;
+          continue
         }
 
-        let message: any;
+        let message: any
         try {
-          message = JSON.parse(line);
+          message = JSON.parse(line)
         } catch (error) {
           send(socket, {
+            error: buildJsonRpcError(
+              -32700,
+              `Invalid JSON: ${(error as Error).message}`,
+            ),
             id: null,
-            error: buildJsonRpcError(-32700, `Invalid JSON: ${(error as Error).message}`)
-          });
-          continue;
+          })
+          continue
         }
 
         if (message.id !== undefined && message.method === "initialize") {
           send(socket, {
             id: message.id,
             result: {
-              userAgent: "agent-companion-broker"
-            }
-          });
-          continue;
+              userAgent: "agent-companion-broker",
+            },
+          })
+          continue
         }
 
         if (message.method === "initialized" && message.id === undefined) {
-          continue;
+          continue
         }
 
         if (message.id !== undefined && message.method === "broker/shutdown") {
-          send(socket, { id: message.id, result: {} });
-          await shutdown(server);
-          process.exit(0);
+          send(socket, { id: message.id, result: {} })
+          await shutdown(server)
+          process.exit(0)
         }
 
         if (message.id === undefined) {
-          continue;
+          continue
         }
 
         const allowInterruptDuringActiveStream =
-          isInterruptRequest(message) && activeStreamSocket && activeStreamSocket !== socket && !activeRequestSocket;
+          isInterruptRequest(message) &&
+          activeStreamSocket &&
+          activeStreamSocket !== socket &&
+          !activeRequestSocket
 
         if (
           ((activeRequestSocket && activeRequestSocket !== socket) ||
@@ -180,78 +204,93 @@ async function main(): Promise<void> {
           !allowInterruptDuringActiveStream
         ) {
           send(socket, {
+            error: buildJsonRpcError(
+              BROKER_BUSY_RPC_CODE,
+              "Shared Agent broker is busy.",
+            ),
             id: message.id,
-            error: buildJsonRpcError(BROKER_BUSY_RPC_CODE, "Shared Agent broker is busy.")
-          });
-          continue;
+          })
+          continue
         }
 
         if (allowInterruptDuringActiveStream) {
           try {
-            const result = await appClient.request(message.method, message.params ?? {});
-            send(socket, { id: message.id, result });
+            const result = await appClient.request(
+              message.method,
+              message.params ?? {},
+            )
+            send(socket, { id: message.id, result })
           } catch (error: any) {
             send(socket, {
+              error: buildJsonRpcError(error.rpcCode ?? -32000, error.message),
               id: message.id,
-              error: buildJsonRpcError(error.rpcCode ?? -32000, error.message)
-            });
+            })
           }
-          continue;
+          continue
         }
 
-        const isStreaming = STREAMING_METHODS.has(message.method);
-        activeRequestSocket = socket;
+        const isStreaming = STREAMING_METHODS.has(message.method)
+        activeRequestSocket = socket
 
         try {
-          const result = await appClient.request(message.method, message.params ?? {});
-          send(socket, { id: message.id, result });
+          const result = await appClient.request(
+            message.method,
+            message.params ?? {},
+          )
+          send(socket, { id: message.id, result })
           if (isStreaming) {
-            activeStreamSocket = socket;
-            activeStreamThreadIds = buildStreamThreadIds(message.method, message.params ?? {}, result);
+            activeStreamSocket = socket
+            activeStreamThreadIds = buildStreamThreadIds(
+              message.method,
+              message.params ?? {},
+              result,
+            )
           }
           if (activeRequestSocket === socket) {
-            activeRequestSocket = null;
+            activeRequestSocket = null
           }
         } catch (error: any) {
           send(socket, {
+            error: buildJsonRpcError(error.rpcCode ?? -32000, error.message),
             id: message.id,
-            error: buildJsonRpcError(error.rpcCode ?? -32000, error.message)
-          });
+          })
           if (activeRequestSocket === socket) {
-            activeRequestSocket = null;
+            activeRequestSocket = null
           }
           if (activeStreamSocket === socket && !isStreaming) {
-            activeStreamSocket = null;
+            activeStreamSocket = null
           }
         }
       }
-    });
+    })
 
     socket.on("close", () => {
-      sockets.delete(socket);
-      clearSocketOwnership(socket);
-    });
+      sockets.delete(socket)
+      clearSocketOwnership(socket)
+    })
 
     socket.on("error", () => {
-      sockets.delete(socket);
-      clearSocketOwnership(socket);
-    });
-  });
+      sockets.delete(socket)
+      clearSocketOwnership(socket)
+    })
+  })
 
   process.on("SIGTERM", async () => {
-    await shutdown(server);
-    process.exit(0);
-  });
+    await shutdown(server)
+    process.exit(0)
+  })
 
   process.on("SIGINT", async () => {
-    await shutdown(server);
-    process.exit(0);
-  });
+    await shutdown(server)
+    process.exit(0)
+  })
 
-  server.listen(listenTarget.path);
+  server.listen(listenTarget.path)
 }
 
 main().catch((error: unknown) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exit(1);
-});
+  process.stderr.write(
+    `${error instanceof Error ? error.message : String(error)}\n`,
+  )
+  process.exit(1)
+})

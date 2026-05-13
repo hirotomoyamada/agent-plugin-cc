@@ -43,7 +43,7 @@ function buildStopReviewPrompt(input = {}) {
         ? ["Previous Claude response:", lastAssistantMessage].join("\n")
         : "";
     return interpolateTemplate(template, {
-        CLAUDE_RESPONSE_BLOCK: claudeResponseBlock
+        CLAUDE_RESPONSE_BLOCK: claudeResponseBlock,
     });
 }
 function buildSetupNote(cwd) {
@@ -59,7 +59,7 @@ function parseStopReviewOutput(rawOutput) {
     if (!text) {
         return {
             ok: false,
-            reason: "The stop-time Agent review task returned no final output. Run /agent:review --wait manually or bypass the gate."
+            reason: "The stop-time Agent review task returned no final output. Run /agent:review --wait manually or bypass the gate.",
         };
     }
     const firstLine = text.split(/\r?\n/, 1)[0].trim();
@@ -70,12 +70,12 @@ function parseStopReviewOutput(rawOutput) {
         const reason = firstLine.slice("BLOCK:".length).trim() || text;
         return {
             ok: false,
-            reason: `Agent stop-time review found issues that still need fixes before ending the session: ${reason}`
+            reason: `Agent stop-time review found issues that still need fixes before ending the session: ${reason}`,
         };
     }
     return {
         ok: false,
-        reason: "The stop-time Agent review task returned an unexpected answer. Run /agent:review --wait manually or bypass the gate."
+        reason: "The stop-time Agent review task returned an unexpected answer. Run /agent:review --wait manually or bypass the gate.",
     };
 }
 function runStopReview(cwd, input = {}) {
@@ -83,18 +83,18 @@ function runStopReview(cwd, input = {}) {
     const prompt = buildStopReviewPrompt(input);
     const childEnv = {
         ...process.env,
-        ...(input.session_id ? { [SESSION_ID_ENV]: input.session_id } : {})
+        ...(input.session_id ? { [SESSION_ID_ENV]: input.session_id } : {}),
     };
     const result = spawnSync(process.execPath, [scriptPath, "task", "--json", prompt], {
         cwd,
         env: childEnv,
         encoding: "utf8",
-        timeout: STOP_REVIEW_TIMEOUT_MS
+        timeout: STOP_REVIEW_TIMEOUT_MS,
     });
     if (result.error?.code === "ETIMEDOUT") {
         return {
             ok: false,
-            reason: "The stop-time Agent review task timed out after 15 minutes. Run /agent:review --wait manually or bypass the gate."
+            reason: "The stop-time Agent review task timed out after 15 minutes. Run /agent:review --wait manually or bypass the gate.",
         };
     }
     if (result.status !== 0) {
@@ -103,7 +103,7 @@ function runStopReview(cwd, input = {}) {
             ok: false,
             reason: detail
                 ? `The stop-time Agent review task failed: ${detail}`
-                : "The stop-time Agent review task failed. Run /agent:review --wait manually or bypass the gate."
+                : "The stop-time Agent review task failed. Run /agent:review --wait manually or bypass the gate.",
         };
     }
     try {
@@ -113,7 +113,7 @@ function runStopReview(cwd, input = {}) {
     catch {
         return {
             ok: false,
-            reason: "The stop-time Agent review task returned invalid JSON. Run /agent:review --wait manually or bypass the gate."
+            reason: "The stop-time Agent review task returned invalid JSON. Run /agent:review --wait manually or bypass the gate.",
         };
     }
 }
@@ -141,7 +141,9 @@ function main() {
     if (!review.ok) {
         emitDecision({
             decision: "block",
-            reason: runningTaskNote ? `${runningTaskNote} ${review.reason}` : review.reason
+            reason: runningTaskNote
+                ? `${runningTaskNote} ${review.reason}`
+                : review.reason,
         });
         return;
     }

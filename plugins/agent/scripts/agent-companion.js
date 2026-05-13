@@ -3,16 +3,16 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_CONTINUE_PROMPT, buildPersistentTaskThreadName, findLatestTaskThread, getAgentAuthStatus, getAgentAvailability, getSessionRuntimeStatus, interruptAppServerTurn, parseStructuredOutput, readOutputSchema, runAppServerReview, runAppServerTurn } from "./lib/agent.js";
+import { DEFAULT_CONTINUE_PROMPT, buildPersistentTaskThreadName, findLatestTaskThread, getAgentAuthStatus, getAgentAvailability, getSessionRuntimeStatus, interruptAppServerTurn, parseStructuredOutput, readOutputSchema, runAppServerReview, runAppServerTurn, } from "./lib/agent.js";
 import { parseArgs, splitRawArgumentString } from "./lib/args.js";
 import { readStdinIfPiped } from "./lib/fs.js";
-import { collectReviewContext, ensureGitRepository, resolveReviewTarget } from "./lib/git.js";
-import { buildSingleJobSnapshot, buildStatusSnapshot, readStoredJob, resolveCancelableJob, resolveResultJob, sortJobsNewestFirst } from "./lib/job-control.js";
+import { collectReviewContext, ensureGitRepository, resolveReviewTarget, } from "./lib/git.js";
+import { buildSingleJobSnapshot, buildStatusSnapshot, readStoredJob, resolveCancelableJob, resolveResultJob, sortJobsNewestFirst, } from "./lib/job-control.js";
 import { binaryAvailable, terminateProcessTree } from "./lib/process.js";
 import { interpolateTemplate, loadPromptTemplate } from "./lib/prompts.js";
-import { renderCancelReport, renderJobStatusReport, renderNativeReviewResult, renderReviewResult, renderSetupReport, renderStatusReport, renderStoredJobResult, renderTaskResult } from "./lib/render.js";
-import { generateJobId, getConfig, listJobs, setConfig, upsertJob, writeJobFile } from "./lib/state.js";
-import { SESSION_ID_ENV, appendLogLine, createJobLogFile, createJobProgressUpdater, createJobRecord, createProgressReporter, nowIso, runTrackedJob } from "./lib/tracked-jobs.js";
+import { renderCancelReport, renderJobStatusReport, renderNativeReviewResult, renderReviewResult, renderSetupReport, renderStatusReport, renderStoredJobResult, renderTaskResult, } from "./lib/render.js";
+import { generateJobId, getConfig, listJobs, setConfig, upsertJob, writeJobFile, } from "./lib/state.js";
+import { SESSION_ID_ENV, appendLogLine, createJobLogFile, createJobProgressUpdater, createJobRecord, createProgressReporter, nowIso, runTrackedJob, } from "./lib/tracked-jobs.js";
 import { resolveWorkspaceRoot } from "./lib/workspace.js";
 const ROOT_DIR = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const REVIEW_SCHEMA = path.join(ROOT_DIR, "schemas", "review-output.schema.json");
@@ -28,7 +28,7 @@ function printUsage() {
         "  node dist/agent-companion.js task [--background] [--write] [--resume-last|--resume <thread-id>|--fresh] [--model <model>] [prompt]",
         "  node dist/agent-companion.js status [job-id] [--all] [--json]",
         "  node dist/agent-companion.js result [job-id] [--json]",
-        "  node dist/agent-companion.js cancel [job-id] [--json]"
+        "  node dist/agent-companion.js cancel [job-id] [--json]",
     ].join("\n"));
 }
 function outputResult(value, asJson) {
@@ -67,12 +67,14 @@ function parseCommandInput(argv, config = {}) {
         ...config,
         aliasMap: {
             C: "cwd",
-            ...(config.aliasMap ?? {})
-        }
+            ...(config.aliasMap ?? {}),
+        },
     });
 }
 function resolveCommandCwd(options = {}) {
-    return options.cwd ? path.resolve(process.cwd(), String(options.cwd)) : process.cwd();
+    return options.cwd
+        ? path.resolve(process.cwd(), String(options.cwd))
+        : process.cwd();
 }
 function resolveCommandWorkspace(options = {}) {
     return resolveWorkspaceRoot(resolveCommandCwd(options));
@@ -125,13 +127,13 @@ async function buildSetupReport(cwd, actionsTaken = []) {
         sessionRuntime: getSessionRuntimeStatus(process.env, workspaceRoot),
         reviewGateEnabled: Boolean(config.stopReviewGate),
         actionsTaken,
-        nextSteps
+        nextSteps,
     };
 }
 async function handleSetup(argv) {
     const { options } = parseCommandInput(argv, {
         valueOptions: ["cwd"],
-        booleanOptions: ["json", "enable-review-gate", "disable-review-gate"]
+        booleanOptions: ["json", "enable-review-gate", "disable-review-gate"],
     });
     if (options["enable-review-gate"] && options["disable-review-gate"]) {
         throw new Error("Choose either --enable-review-gate or --disable-review-gate.");
@@ -157,7 +159,7 @@ function buildAdversarialReviewPrompt(context, focusText) {
         TARGET_LABEL: context.target.label,
         USER_FOCUS: focusText || "No extra focus provided.",
         REVIEW_COLLECTION_GUIDANCE: context.collectionGuidance,
-        REVIEW_INPUT: context.content
+        REVIEW_INPUT: context.content,
     });
 }
 function ensureAgentAvailable(cwd) {
@@ -202,21 +204,25 @@ function filterJobsForCurrentClaudeSession(jobs) {
     return jobs.filter((job) => job.sessionId === sessionId);
 }
 function findLatestResumableTaskJob(jobs) {
-    return (jobs.find((job) => job.jobClass === "task" && job.threadId && job.status !== "queued" && job.status !== "running") ?? null);
+    return (jobs.find((job) => job.jobClass === "task" &&
+        job.threadId &&
+        job.status !== "queued" &&
+        job.status !== "running") ?? null);
 }
 async function waitForSingleJobSnapshot(cwd, reference, options = {}) {
     const timeoutMs = Math.max(0, Number(options.timeoutMs) || DEFAULT_STATUS_WAIT_TIMEOUT_MS);
     const pollIntervalMs = Math.max(100, Number(options.pollIntervalMs) || DEFAULT_STATUS_POLL_INTERVAL_MS);
     const deadline = Date.now() + timeoutMs;
     let snapshot = buildSingleJobSnapshot(cwd, reference);
-    while (isActiveJobStatus(String(snapshot.job.status)) && Date.now() < deadline) {
+    while (isActiveJobStatus(String(snapshot.job.status)) &&
+        Date.now() < deadline) {
         await sleep(Math.min(pollIntervalMs, Math.max(0, deadline - Date.now())));
         snapshot = buildSingleJobSnapshot(cwd, reference);
     }
     return {
         ...snapshot,
         waitTimedOut: isActiveJobStatus(String(snapshot.job.status)),
-        timeoutMs
+        timeoutMs,
     };
 }
 async function resolveLatestTrackedTaskThread(cwd, options = {}) {
@@ -224,7 +230,8 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
     const sessionId = getCurrentClaudeSessionId();
     const jobs = sortJobsNewestFirst(listJobs(workspaceRoot)).filter((job) => job.id !== options.excludeJobId);
     const visibleJobs = filterJobsForCurrentClaudeSession(jobs);
-    const activeTask = visibleJobs.find((job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running"));
+    const activeTask = visibleJobs.find((job) => job.jobClass === "task" &&
+        (job.status === "queued" || job.status === "running"));
     if (activeTask) {
         throw new Error(`Task ${activeTask.id} is still running. Use /agent:status before continuing it.`);
     }
@@ -242,7 +249,7 @@ async function executeReviewRun(request) {
     ensureGitRepository(request.cwd);
     const target = resolveReviewTarget(request.cwd, {
         base: request.base,
-        scope: request.scope
+        scope: request.scope,
     });
     const focusText = request.focusText?.trim() ?? "";
     const reviewName = request.reviewName ?? "Review";
@@ -251,7 +258,7 @@ async function executeReviewRun(request) {
         const result = await runAppServerReview(request.cwd, {
             target: reviewTarget,
             model: request.model,
-            onProgress: request.onProgress
+            onProgress: request.onProgress,
         });
         const payload = {
             review: reviewName,
@@ -262,14 +269,18 @@ async function executeReviewRun(request) {
                 status: result.status,
                 stderr: result.stderr,
                 stdout: result.reviewText,
-                reasoning: result.reasoningSummary
-            }
+                reasoning: result.reasoningSummary,
+            },
         };
         const rendered = renderNativeReviewResult({
             status: result.status,
             stdout: result.reviewText,
-            stderr: result.stderr
-        }, { reviewLabel: reviewName, targetLabel: target.label, reasoningSummary: result.reasoningSummary });
+            stderr: result.stderr,
+        }, {
+            reviewLabel: reviewName,
+            targetLabel: target.label,
+            reasoningSummary: result.reasoningSummary,
+        });
         return {
             exitStatus: result.status,
             threadId: result.threadId,
@@ -279,7 +290,7 @@ async function executeReviewRun(request) {
             summary: firstMeaningfulLine(result.reviewText, `${reviewName} completed.`),
             jobTitle: `Agent ${reviewName}`,
             jobClass: "review",
-            targetLabel: target.label
+            targetLabel: target.label,
         };
     }
     const context = collectReviewContext(request.cwd, target);
@@ -289,11 +300,11 @@ async function executeReviewRun(request) {
         model: request.model,
         sandbox: "read-only",
         outputSchema: readOutputSchema(REVIEW_SCHEMA),
-        onProgress: request.onProgress
+        onProgress: request.onProgress,
     });
     const parsed = parseStructuredOutput(result.finalMessage, {
         status: result.status,
-        failureMessage: result.error?.message ?? result.stderr
+        failureMessage: result.error?.message ?? result.stderr,
     });
     const payload = {
         review: reviewName,
@@ -302,18 +313,18 @@ async function executeReviewRun(request) {
         context: {
             repoRoot: context.repoRoot,
             branch: context.branch,
-            summary: context.summary
+            summary: context.summary,
         },
         agent: {
             status: result.status,
             stderr: result.stderr,
             stdout: result.finalMessage,
-            reasoning: result.reasoningSummary
+            reasoning: result.reasoningSummary,
         },
         result: parsed.parsed,
         rawOutput: parsed.rawOutput,
         parseError: parsed.parseError,
-        reasoningSummary: result.reasoningSummary
+        reasoningSummary: result.reasoningSummary,
     };
     return {
         exitStatus: result.status,
@@ -323,14 +334,14 @@ async function executeReviewRun(request) {
         rendered: renderReviewResult(parsed, {
             reviewLabel: reviewName,
             targetLabel: context.target.label,
-            reasoningSummary: result.reasoningSummary
+            reasoningSummary: result.reasoningSummary,
         }),
         summary: parsed.parsed?.summary ??
             parsed.parseError ??
             firstMeaningfulLine(result.finalMessage, `${reviewName} finished.`),
         jobTitle: `Agent ${reviewName}`,
         jobClass: "review",
-        targetLabel: context.target.label
+        targetLabel: context.target.label,
     };
 }
 async function executeTaskRun(request) {
@@ -338,7 +349,7 @@ async function executeTaskRun(request) {
     ensureAgentAvailable(request.cwd);
     const taskMetadata = buildTaskRunMetadata({
         prompt: request.prompt,
-        resumeLast: request.resumeLast || Boolean(request.resumeId)
+        resumeLast: request.resumeLast || Boolean(request.resumeId),
     });
     let resumeThreadId = null;
     if (request.resumeId) {
@@ -346,7 +357,7 @@ async function executeTaskRun(request) {
     }
     else if (request.resumeLast) {
         const latestThread = await resolveLatestTrackedTaskThread(workspaceRoot, {
-            excludeJobId: request.jobId
+            excludeJobId: request.jobId,
         });
         if (!latestThread) {
             throw new Error("No previous Agent task thread was found for this repository.");
@@ -365,25 +376,27 @@ async function executeTaskRun(request) {
         sandbox: request.write ? "workspace-write" : "read-only",
         onProgress: request.onProgress,
         persistThread: true,
-        threadName: resumeThreadId ? null : buildPersistentTaskThreadName(request.prompt || DEFAULT_CONTINUE_PROMPT)
+        threadName: resumeThreadId
+            ? null
+            : buildPersistentTaskThreadName(request.prompt || DEFAULT_CONTINUE_PROMPT),
     });
     const rawOutput = typeof result.finalMessage === "string" ? result.finalMessage : "";
     const failureMessage = result.error?.message ?? result.stderr ?? "";
     const rendered = renderTaskResult({
         rawOutput,
         failureMessage,
-        reasoningSummary: result.reasoningSummary
+        reasoningSummary: result.reasoningSummary,
     }, {
         title: taskMetadata.title,
         jobId: request.jobId ?? null,
-        write: Boolean(request.write)
+        write: Boolean(request.write),
     });
     const payload = {
         status: result.status,
         threadId: result.threadId,
         rawOutput,
         touchedFiles: result.touchedFiles,
-        reasoningSummary: result.reasoningSummary
+        reasoningSummary: result.reasoningSummary,
     };
     return {
         exitStatus: result.status,
@@ -394,28 +407,28 @@ async function executeTaskRun(request) {
         summary: firstMeaningfulLine(rawOutput, firstMeaningfulLine(failureMessage, `${taskMetadata.title} finished.`)),
         jobTitle: taskMetadata.title,
         jobClass: "task",
-        write: Boolean(request.write)
+        write: Boolean(request.write),
     };
 }
 function buildReviewJobMetadata(reviewName, target) {
     return {
         kind: reviewName === "Adversarial Review" ? "adversarial-review" : "review",
         title: reviewName === "Review" ? "Agent Review" : `Agent ${reviewName}`,
-        summary: `${reviewName} ${target.label}`
+        summary: `${reviewName} ${target.label}`,
     };
 }
-function buildTaskRunMetadata({ prompt, resumeLast = false }) {
+function buildTaskRunMetadata({ prompt, resumeLast = false, }) {
     if (!resumeLast && String(prompt ?? "").includes(STOP_REVIEW_TASK_MARKER)) {
         return {
             title: "Agent Stop Gate Review",
-            summary: "Stop-gate review of previous Claude turn"
+            summary: "Stop-gate review of previous Claude turn",
         };
     }
     const title = resumeLast ? "Agent Resume" : "Agent Task";
     const fallbackSummary = resumeLast ? DEFAULT_CONTINUE_PROMPT : "Task";
     return {
         title,
-        summary: shorten(prompt || fallbackSummary)
+        summary: shorten(prompt || fallbackSummary),
     };
 }
 function renderQueuedTaskLaunch(payload) {
@@ -427,7 +440,7 @@ function getJobKindLabel(kind, jobClass) {
     }
     return jobClass === "review" ? "review" : "rescue";
 }
-function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summary, write = false }) {
+function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summary, write = false, }) {
     return createJobRecord({
         id: generateJobId(prefix),
         kind,
@@ -436,7 +449,7 @@ function createCompanionJob({ prefix, kind, title, workspaceRoot, jobClass, summ
         workspaceRoot,
         jobClass,
         summary,
-        write
+        write,
     });
 }
 function createTrackedProgress(job, options = {}) {
@@ -446,8 +459,8 @@ function createTrackedProgress(job, options = {}) {
         progress: createProgressReporter({
             stderr: Boolean(options.stderr),
             logFile,
-            onEvent: createJobProgressUpdater(job.workspaceRoot, job.id)
-        })
+            onEvent: createJobProgressUpdater(job.workspaceRoot, job.id),
+        }),
     };
 }
 function buildTaskJob(workspaceRoot, taskMetadata, write) {
@@ -458,10 +471,10 @@ function buildTaskJob(workspaceRoot, taskMetadata, write) {
         workspaceRoot,
         jobClass: "task",
         summary: taskMetadata.summary,
-        write
+        write,
     });
 }
-function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, resumeId, jobId }) {
+function buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, resumeId, jobId, }) {
     return { cwd, model, effort, prompt, write, resumeLast, resumeId, jobId };
 }
 function readTaskPrompt(cwd, options, positionals) {
@@ -479,9 +492,11 @@ function requireTaskRequest(prompt, resumeLast) {
 async function runForegroundCommand(job, runner, options = {}) {
     const { logFile, progress } = createTrackedProgress(job, {
         logFile: options.logFile,
-        stderr: !options.json
+        stderr: !options.json,
     });
-    const execution = await runTrackedJob(job, () => runner(progress), { logFile });
+    const execution = await runTrackedJob(job, () => runner(progress), {
+        logFile,
+    });
     outputResult(options.json ? execution.payload : execution.rendered, Boolean(options.json));
     if (execution.exitStatus !== 0) {
         process.exitCode = execution.exitStatus;
@@ -495,7 +510,7 @@ function spawnDetachedTaskWorker(cwd, jobId) {
         env: process.env,
         detached: true,
         stdio: "ignore",
-        windowsHide: true
+        windowsHide: true,
     });
     child.unref();
     return child;
@@ -510,7 +525,7 @@ function enqueueBackgroundTask(cwd, job, request) {
         phase: "queued",
         pid: child.pid ?? null,
         logFile,
-        request
+        request,
     };
     writeJobFile(job.workspaceRoot, job.id, queuedRecord);
     upsertJob(job.workspaceRoot, queuedRecord);
@@ -520,23 +535,23 @@ function enqueueBackgroundTask(cwd, job, request) {
             status: "queued",
             title: job.title,
             summary: job.summary,
-            logFile
+            logFile,
         },
-        logFile
+        logFile,
     };
 }
 async function handleReviewCommand(argv, config) {
     const { options, positionals } = parseCommandInput(argv, {
         valueOptions: ["base", "scope", "model", "cwd"],
         booleanOptions: ["json", "background", "wait"],
-        aliasMap: { m: "model" }
+        aliasMap: { m: "model" },
     });
     const cwd = resolveCommandCwd(options);
     const workspaceRoot = resolveCommandWorkspace(options);
     const focusText = positionals.join(" ").trim();
     const target = resolveReviewTarget(cwd, {
         base: options.base,
-        scope: options.scope
+        scope: options.scope,
     });
     config.validateRequest?.(target, focusText);
     const metadata = buildReviewJobMetadata(config.reviewName, target);
@@ -546,7 +561,7 @@ async function handleReviewCommand(argv, config) {
         title: metadata.title,
         workspaceRoot,
         jobClass: "review",
-        summary: metadata.summary
+        summary: metadata.summary,
     });
     await runForegroundCommand(job, (progress) => executeReviewRun({
         cwd,
@@ -555,20 +570,27 @@ async function handleReviewCommand(argv, config) {
         model: options.model,
         focusText,
         reviewName: config.reviewName,
-        onProgress: progress
+        onProgress: progress,
     }), { json: options.json });
 }
 async function handleReview(argv) {
     return handleReviewCommand(argv, {
         reviewName: "Review",
-        validateRequest: validateNativeReviewRequest
+        validateRequest: validateNativeReviewRequest,
     });
 }
 async function handleTask(argv) {
     const { options, positionals } = parseCommandInput(argv, {
         valueOptions: ["model", "effort", "cwd", "prompt-file", "resume-id"],
-        booleanOptions: ["json", "write", "resume-last", "resume", "fresh", "background"],
-        aliasMap: { m: "model" }
+        booleanOptions: [
+            "json",
+            "write",
+            "resume-last",
+            "resume",
+            "fresh",
+            "background",
+        ],
+        aliasMap: { m: "model" },
     });
     const cwd = resolveCommandCwd(options);
     const workspaceRoot = resolveCommandWorkspace(options);
@@ -586,12 +608,24 @@ async function handleTask(argv) {
         throw new Error("Choose either --resume/--resume-last/--resume-id or --fresh.");
     }
     const write = Boolean(options.write);
-    const taskMetadata = buildTaskRunMetadata({ prompt, resumeLast: resumeLast || Boolean(resumeId) });
+    const taskMetadata = buildTaskRunMetadata({
+        prompt,
+        resumeLast: resumeLast || Boolean(resumeId),
+    });
     if (options.background) {
         ensureAgentAvailable(cwd);
         requireTaskRequest(prompt, resumeLast || Boolean(resumeId));
         const job = buildTaskJob(workspaceRoot, taskMetadata, write);
-        const request = buildTaskRequest({ cwd, model, effort, prompt, write, resumeLast, resumeId, jobId: job.id });
+        const request = buildTaskRequest({
+            cwd,
+            model,
+            effort,
+            prompt,
+            write,
+            resumeLast,
+            resumeId,
+            jobId: job.id,
+        });
         const { payload } = enqueueBackgroundTask(cwd, job, request);
         outputCommandResult(payload, renderQueuedTaskLaunch(payload), Boolean(options.json));
         return;
@@ -606,12 +640,12 @@ async function handleTask(argv) {
         resumeLast,
         resumeId,
         jobId: job.id,
-        onProgress: progress
+        onProgress: progress,
     }), { json: options.json });
 }
 async function handleTaskWorker(argv) {
     const { options } = parseCommandInput(argv, {
-        valueOptions: ["cwd", "job-id"]
+        valueOptions: ["cwd", "job-id"],
     });
     if (!options["job-id"]) {
         throw new Error("Missing required --job-id for task-worker.");
@@ -632,7 +666,7 @@ async function handleTaskWorker(argv) {
 async function handleStatus(argv) {
     const { options, positionals } = parseCommandInput(argv, {
         valueOptions: ["cwd", "timeout-ms", "poll-interval-ms"],
-        booleanOptions: ["json", "all", "wait"]
+        booleanOptions: ["json", "all", "wait"],
     });
     const cwd = resolveCommandCwd(options);
     const reference = positionals[0] ?? "";
@@ -640,7 +674,7 @@ async function handleStatus(argv) {
         const snapshot = options.wait
             ? await waitForSingleJobSnapshot(cwd, reference, {
                 timeoutMs: options["timeout-ms"],
-                pollIntervalMs: options["poll-interval-ms"]
+                pollIntervalMs: options["poll-interval-ms"],
             })
             : buildSingleJobSnapshot(cwd, reference);
         outputCommandResult(snapshot, renderJobStatusReport(snapshot.job), Boolean(options.json));
@@ -655,7 +689,7 @@ async function handleStatus(argv) {
 function handleResult(argv) {
     const { options, positionals } = parseCommandInput(argv, {
         valueOptions: ["cwd"],
-        booleanOptions: ["json"]
+        booleanOptions: ["json"],
     });
     const cwd = resolveCommandCwd(options);
     const reference = positionals[0] ?? "";
@@ -667,7 +701,7 @@ function handleResult(argv) {
 function handleTaskResumeCandidate(argv) {
     const { options } = parseCommandInput(argv, {
         valueOptions: ["cwd"],
-        booleanOptions: ["json"]
+        booleanOptions: ["json"],
     });
     const _cwd = resolveCommandCwd(options);
     const workspaceRoot = resolveCommandWorkspace(options);
@@ -686,8 +720,8 @@ function handleTaskResumeCandidate(argv) {
                 summary: candidate.summary ?? null,
                 threadId: candidate.threadId,
                 completedAt: candidate.completedAt ?? null,
-                updatedAt: candidate.updatedAt ?? null
-            }
+                updatedAt: candidate.updatedAt ?? null,
+            },
     };
     const rendered = candidate
         ? `Resumable task found: ${candidate.id} (${candidate.status}).\n`
@@ -697,11 +731,13 @@ function handleTaskResumeCandidate(argv) {
 async function handleCancel(argv) {
     const { options, positionals } = parseCommandInput(argv, {
         valueOptions: ["cwd"],
-        booleanOptions: ["json"]
+        booleanOptions: ["json"],
     });
     const cwd = resolveCommandCwd(options);
     const reference = positionals[0] ?? "";
-    const { workspaceRoot, job } = resolveCancelableJob(cwd, reference, { env: process.env });
+    const { workspaceRoot, job } = resolveCancelableJob(cwd, reference, {
+        env: process.env,
+    });
     const existing = readStoredJob(workspaceRoot, job.id) ?? {};
     const threadId = existing.threadId ?? job.threadId ?? null;
     const turnId = existing.turnId ?? job.turnId ?? null;
@@ -720,12 +756,12 @@ async function handleCancel(argv) {
         phase: "cancelled",
         pid: null,
         completedAt,
-        errorMessage: "Cancelled by user."
+        errorMessage: "Cancelled by user.",
     };
     writeJobFile(workspaceRoot, job.id, {
         ...existing,
         ...nextJob,
-        cancelledAt: completedAt
+        cancelledAt: completedAt,
     });
     upsertJob(workspaceRoot, {
         id: job.id,
@@ -733,14 +769,14 @@ async function handleCancel(argv) {
         phase: "cancelled",
         pid: null,
         errorMessage: "Cancelled by user.",
-        completedAt
+        completedAt,
     });
     const payload = {
         jobId: job.id,
         status: "cancelled",
         title: job.title,
         turnInterruptAttempted: interrupt.attempted,
-        turnInterrupted: interrupt.interrupted
+        turnInterrupted: interrupt.interrupted,
     };
     outputCommandResult(payload, renderCancelReport(nextJob), Boolean(options.json));
 }
@@ -759,7 +795,7 @@ async function main() {
             break;
         case "adversarial-review":
             await handleReviewCommand(argv, {
-                reviewName: "Adversarial Review"
+                reviewName: "Adversarial Review",
             });
             break;
         case "task":

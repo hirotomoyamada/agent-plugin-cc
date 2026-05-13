@@ -6,6 +6,8 @@ export function loadPromptTemplate(rootDir, name) {
 }
 export function interpolateTemplate(template, variables) {
     return template.replace(/\{\{([A-Z_]+)\}\}/g, (_, key) => {
-        return Object.prototype.hasOwnProperty.call(variables, key) ? (variables[key] ?? "") : "";
+        return Object.prototype.hasOwnProperty.call(variables, key)
+            ? (variables[key] ?? "")
+            : "";
     });
 }

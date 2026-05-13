@@ -5,7 +5,11 @@ import process from "node:process";
 import { AgentAppServerClient, BROKER_BUSY_RPC_CODE } from "./lib/app-server.js";
 import { parseArgs } from "./lib/args.js";
 import { parseBrokerEndpoint } from "./lib/broker-endpoint.js";
-const STREAMING_METHODS = new Set(["turn/start", "review/start", "thread/compact/start"]);
+const STREAMING_METHODS = new Set([
+    "turn/start",
+    "review/start",
+    "thread/compact/start",
+]);
 function buildStreamThreadIds(method, params, result) {
     const threadIds = new Set();
     if (params?.threadId) {
@@ -41,17 +45,23 @@ async function main() {
         throw new Error("Usage: node dist/app-server-broker.js serve --endpoint <value> [--cwd <path>] [--pid-file <path>]");
     }
     const { options } = parseArgs(argv, {
-        valueOptions: ["cwd", "pid-file", "endpoint"]
+        valueOptions: ["cwd", "pid-file", "endpoint"],
     });
     if (!options.endpoint) {
         throw new Error("Missing required --endpoint.");
     }
-    const cwd = options.cwd ? path.resolve(process.cwd(), String(options.cwd)) : process.cwd();
+    const cwd = options.cwd
+        ? path.resolve(process.cwd(), String(options.cwd))
+        : process.cwd();
     const endpoint = String(options.endpoint);
     const listenTarget = parseBrokerEndpoint(endpoint);
-    const pidFile = options["pid-file"] ? path.resolve(String(options["pid-file"])) : null;
+    const pidFile = options["pid-file"]
+        ? path.resolve(String(options["pid-file"]))
+        : null;
     writePidFile(pidFile);
-    const appClient = await AgentAppServerClient.connect(cwd, { disableBroker: true });
+    const appClient = await AgentAppServerClient.connect(cwd, {
+        disableBroker: true,
+    });
     let activeRequestSocket = null;
     let activeStreamSocket = null;
     let activeStreamThreadIds = null;
@@ -73,7 +83,9 @@ async function main() {
         send(target, message);
         if (message.method === "turn/completed" && activeStreamSocket === target) {
             const threadId = message.params?.threadId ?? null;
-            if (!threadId || !activeStreamThreadIds || activeStreamThreadIds.has(threadId)) {
+            if (!threadId ||
+                !activeStreamThreadIds ||
+                activeStreamThreadIds.has(threadId)) {
                 activeStreamSocket = null;
                 activeStreamThreadIds = null;
                 if (activeRequestSocket === target) {
@@ -117,7 +129,7 @@ async function main() {
                 catch (error) {
                     send(socket, {
                         id: null,
-                        error: buildJsonRpcError(-32700, `Invalid JSON: ${error.message}`)
+                        error: buildJsonRpcError(-32700, `Invalid JSON: ${error.message}`),
                     });
                     continue;
                 }
@@ -125,8 +137,8 @@ async function main() {
                     send(socket, {
                         id: message.id,
                         result: {
-                            userAgent: "agent-companion-broker"
-                        }
+                            userAgent: "agent-companion-broker",
+                        },
                     });
                     continue;
                 }
@@ -141,13 +153,16 @@ async function main() {
                 if (message.id === undefined) {
                     continue;
                 }
-                const allowInterruptDuringActiveStream = isInterruptRequest(message) && activeStreamSocket && activeStreamSocket !== socket && !activeRequestSocket;
+                const allowInterruptDuringActiveStream = isInterruptRequest(message) &&
+                    activeStreamSocket &&
+                    activeStreamSocket !== socket &&
+                    !activeRequestSocket;
                 if (((activeRequestSocket && activeRequestSocket !== socket) ||
                     (activeStreamSocket && activeStreamSocket !== socket)) &&
                     !allowInterruptDuringActiveStream) {
                     send(socket, {
                         id: message.id,
-                        error: buildJsonRpcError(BROKER_BUSY_RPC_CODE, "Shared Agent broker is busy.")
+                        error: buildJsonRpcError(BROKER_BUSY_RPC_CODE, "Shared Agent broker is busy."),
                     });
                     continue;
                 }
@@ -159,7 +174,7 @@ async function main() {
                     catch (error) {
                         send(socket, {
                             id: message.id,
-                            error: buildJsonRpcError(error.rpcCode ?? -32000, error.message)
+                            error: buildJsonRpcError(error.rpcCode ?? -32000, error.message),
                         });
                     }
                     continue;
@@ -180,7 +195,7 @@ async function main() {
                 catch (error) {
                     send(socket, {
                         id: message.id,
-                        error: buildJsonRpcError(error.rpcCode ?? -32000, error.message)
+                        error: buildJsonRpcError(error.rpcCode ?? -32000, error.message),
                     });
                     if (activeRequestSocket === socket) {
                         activeRequestSocket = null;

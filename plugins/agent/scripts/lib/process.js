@@ -9,7 +9,7 @@ export function runCommand(command, args = [], options = {}) {
         maxBuffer: options.maxBuffer,
         stdio: options.stdio ?? "pipe",
         shell: process.platform === "win32" ? process.env.SHELL || true : false,
-        windowsHide: true
+        windowsHide: true,
     });
     return {
         command,
@@ -18,7 +18,7 @@ export function runCommand(command, args = [], options = {}) {
         signal: result.signal ?? null,
         stdout: result.stdout ?? "",
         stderr: result.stderr ?? "",
-        error: result.error ?? null
+        error: result.error ?? null,
     };
 }
 export function runCommandChecked(command, args = [], options = {}) {
@@ -33,7 +33,8 @@ export function runCommandChecked(command, args = [], options = {}) {
 }
 export function binaryAvailable(command, versionArgs = ["--version"], options = {}) {
     const result = runCommand(command, versionArgs, options);
-    if (result.error && result.error.code === "ENOENT") {
+    if (result.error &&
+        result.error.code === "ENOENT") {
         return { available: false, detail: "not found" };
     }
     if (result.error) {
@@ -43,7 +44,10 @@ export function binaryAvailable(command, versionArgs = ["--version"], options = 
         const detail = result.stderr.trim() || result.stdout.trim() || `exit ${result.status}`;
         return { available: false, detail };
     }
-    return { available: true, detail: result.stdout.trim() || result.stderr.trim() || "ok" };
+    return {
+        available: true,
+        detail: result.stdout.trim() || result.stderr.trim() || "ok",
+    };
 }
 function looksLikeMissingProcessMessage(text) {
     return /not found|no running instance|cannot find|does not exist|no such process/i.test(text);
@@ -58,7 +62,7 @@ export function terminateProcessTree(pid, options = {}) {
     if (platform === "win32") {
         const result = runCommandImpl("taskkill", ["/PID", String(pid), "/T", "/F"], {
             cwd: options.cwd,
-            env: options.env
+            env: options.env,
         });
         if (!result.error && result.status === 0) {
             return { attempted: true, delivered: true, method: "taskkill", result };

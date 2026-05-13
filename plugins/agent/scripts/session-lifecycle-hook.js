@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import process from "node:process";
 import { BROKER_ENDPOINT_ENV } from "./lib/app-server.js";
-import { LOG_FILE_ENV, PID_FILE_ENV, clearBrokerSession, loadBrokerSession, sendBrokerShutdown, teardownBrokerSession } from "./lib/broker-lifecycle.js";
+import { LOG_FILE_ENV, PID_FILE_ENV, clearBrokerSession, loadBrokerSession, sendBrokerShutdown, teardownBrokerSession, } from "./lib/broker-lifecycle.js";
 import { terminateProcessTree } from "./lib/process.js";
 import { loadState, resolveStateFile, saveState } from "./lib/state.js";
 import { resolveWorkspaceRoot } from "./lib/workspace.js";
@@ -51,7 +51,7 @@ function cleanupSessionJobs(cwd, sessionId) {
     }
     saveState(workspaceRoot, {
         ...state,
-        jobs: state.jobs.filter((job) => job.sessionId !== sessionId)
+        jobs: state.jobs.filter((job) => job.sessionId !== sessionId),
     });
 }
 function handleSessionStart(input) {
@@ -65,7 +65,7 @@ async function handleSessionEnd(input) {
             ? {
                 endpoint: process.env[BROKER_ENDPOINT_ENV],
                 pidFile: process.env[PID_FILE_ENV] ?? null,
-                logFile: process.env[LOG_FILE_ENV] ?? null
+                logFile: process.env[LOG_FILE_ENV] ?? null,
             }
             : null);
     const brokerEndpoint = brokerSession?.endpoint ?? null;
@@ -83,7 +83,7 @@ async function handleSessionEnd(input) {
         logFile,
         sessionDir,
         pid,
-        killProcess: terminateProcessTree
+        killProcess: terminateProcessTree,
     });
     clearBrokerSession(cwd);
 }

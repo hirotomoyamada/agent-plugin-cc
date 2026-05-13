@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
-import { AgentAppServerClient, BROKER_BUSY_RPC_CODE, BROKER_ENDPOINT_ENV } from "./app-server.js";
+import { AgentAppServerClient, BROKER_BUSY_RPC_CODE, BROKER_ENDPOINT_ENV, } from "./app-server.js";
 import { loadBrokerSession } from "./broker-lifecycle.js";
 import { readJsonFile } from "./fs.js";
 import { binaryAvailable, runCommand } from "./process.js";
@@ -11,7 +11,8 @@ function cleanAgentStderr(stderr) {
     return stderr
         .split(/\r?\n/)
         .map((line) => line.trimEnd())
-        .filter((line) => line && !line.startsWith("WARNING: proceeding, even though we could not update PATH:"))
+        .filter((line) => line &&
+        !line.startsWith("WARNING: proceeding, even though we could not update PATH:"))
         .join("\n");
 }
 function buildThreadParams(cwd, options = {}) {
@@ -22,7 +23,7 @@ function buildThreadParams(cwd, options = {}) {
         sandbox: options.sandbox ?? "read-only",
         serviceName: SERVICE_NAME,
         ephemeral: options.ephemeral ?? true,
-        experimentalRawEvents: false
+        experimentalRawEvents: false,
     };
 }
 function buildResumeParams(threadId, cwd, options = {}) {
@@ -31,7 +32,7 @@ function buildResumeParams(threadId, cwd, options = {}) {
         cwd,
         model: options.model ?? null,
         approvalPolicy: options.approvalPolicy ?? "never",
-        sandbox: options.sandbox ?? "read-only"
+        sandbox: options.sandbox ?? "read-only",
     };
 }
 function _buildTurnInput(prompt) {
@@ -141,11 +142,13 @@ function emitLogEvent(onProgress, options = {}) {
         phase: options.phase ?? null,
         stderrMessage: options.stderrMessage ?? null,
         logTitle: options.logTitle ?? null,
-        logBody: options.logBody ?? null
+        logBody: options.logBody ?? null,
     });
 }
 function labelForThread(state, threadId) {
-    if (!threadId || threadId === state.rootThreadId || threadId === state.threadId) {
+    if (!threadId ||
+        threadId === state.rootThreadId ||
+        threadId === state.threadId) {
         return null;
     }
     return state.threadLabels.get(threadId) ?? threadId;
@@ -170,27 +173,29 @@ function describeStartedItem(state, item) {
         case "enteredReviewMode":
             return {
                 message: `Reviewer started: ${item.review}`,
-                phase: "reviewing"
+                phase: "reviewing",
             };
         case "commandExecution":
             return {
                 message: `Running command: ${shorten(item.command, 96)}`,
-                phase: looksLikeVerificationCommand(item.command) ? "verifying" : "running"
+                phase: looksLikeVerificationCommand(item.command)
+                    ? "verifying"
+                    : "running",
             };
         case "fileChange":
             return {
                 message: `Applying ${item.changes.length} file change(s).`,
-                phase: "editing"
+                phase: "editing",
             };
         case "mcpToolCall":
             return {
                 message: `Calling ${item.server}/${item.tool}.`,
-                phase: "investigating"
+                phase: "investigating",
             };
         case "dynamicToolCall":
             return {
                 message: `Running tool: ${item.tool}.`,
-                phase: "investigating"
+                phase: "investigating",
             };
         case "collabAgentToolCall": {
             const subagents = (item.receiverThreadIds ?? []).map((threadId) => labelForThread(state, threadId) ?? threadId);
@@ -202,7 +207,7 @@ function describeStartedItem(state, item) {
         case "webSearch":
             return {
                 message: `Searching: ${shorten(item.query, 96)}`,
-                phase: "investigating"
+                phase: "investigating",
             };
         default:
             return null;
@@ -215,7 +220,9 @@ function describeCompletedItem(state, item) {
             const statusLabel = item.status === "completed" ? "completed" : item.status;
             return {
                 message: `Command ${statusLabel}: ${shorten(item.command, 96)} (exit ${exitCode})`,
-                phase: looksLikeVerificationCommand(item.command) ? "verifying" : "running"
+                phase: looksLikeVerificationCommand(item.command)
+                    ? "verifying"
+                    : "running",
             };
         }
         case "fileChange":
@@ -223,12 +230,12 @@ function describeCompletedItem(state, item) {
         case "mcpToolCall":
             return {
                 message: `Tool ${item.server}/${item.tool} ${item.status}.`,
-                phase: "investigating"
+                phase: "investigating",
             };
         case "dynamicToolCall":
             return {
                 message: `Tool ${item.tool} ${item.status}.`,
-                phase: "investigating"
+                phase: "investigating",
             };
         case "collabAgentToolCall": {
             const subagents = (item.receiverThreadIds ?? []).map((threadId) => labelForThread(state, threadId) ?? threadId);
@@ -274,7 +281,7 @@ function createTurnCaptureState(threadId, options = {}) {
         messages: [],
         fileChanges: [],
         commandExecutions: [],
-        onProgress: options.onProgress ?? null
+        onProgress: options.onProgress ?? null,
     };
 }
 function clearCompletionTimer(state) {
@@ -298,7 +305,7 @@ function completeTurn(state, turn = null, options = {}) {
     else if (!state.finalTurn) {
         state.finalTurn = {
             id: state.turnId ?? "inferred-turn",
-            status: "completed"
+            status: "completed",
         };
     }
     if (options.inferred) {
@@ -310,7 +317,8 @@ function scheduleInferredCompletion(state) {
     if (state.completed || state.finalTurn || !state.finalAnswerSeen) {
         return;
     }
-    if (state.pendingCollaborations.size > 0 || state.activeSubagentTurns.size > 0) {
+    if (state.pendingCollaborations.size > 0 ||
+        state.activeSubagentTurns.size > 0) {
         return;
     }
     clearCompletionTimer(state);
@@ -319,7 +327,8 @@ function scheduleInferredCompletion(state) {
         if (state.completed || state.finalTurn || !state.finalAnswerSeen) {
             return;
         }
-        if (state.pendingCollaborations.size > 0 || state.activeSubagentTurns.size > 0) {
+        if (state.pendingCollaborations.size > 0 ||
+            state.activeSubagentTurns.size > 0) {
             return;
         }
         completeTurn(state, null, { inferred: true });
@@ -333,7 +342,9 @@ function belongsToTurn(state, message) {
     }
     const trackedTurnId = state.threadTurnIds.get(messageThreadId) ?? null;
     const messageTurnId = extractTurnId(message);
-    return trackedTurnId === null || messageTurnId === null || messageTurnId === trackedTurnId;
+    return (trackedTurnId === null ||
+        messageTurnId === null ||
+        messageTurnId === trackedTurnId);
 }
 function recordItem(state, item, lifecycle, threadId = null) {
     if (item.type === "collabAgentToolCall") {
@@ -354,7 +365,7 @@ function recordItem(state, item, lifecycle, threadId = null) {
         state.messages.push({
             lifecycle,
             phase: item.phase ?? null,
-            text: item.text ?? ""
+            text: item.text ?? "",
         });
         if (item.text) {
             if (!threadId || threadId === state.threadId) {
@@ -372,8 +383,10 @@ function recordItem(state, item, lifecycle, threadId = null) {
                         : `Assistant message captured: ${shorten(item.text, 96)}`,
                     stderrMessage: null,
                     phase: item.phase === "final_answer" ? "finalizing" : null,
-                    logTitle: sourceLabel ? `Subagent ${sourceLabel} message` : "Assistant message",
-                    logBody: item.text
+                    logTitle: sourceLabel
+                        ? `Subagent ${sourceLabel} message`
+                        : "Assistant message",
+                    logBody: item.text,
                 });
             }
         }
@@ -387,7 +400,7 @@ function recordItem(state, item, lifecycle, threadId = null) {
                 stderrMessage: null,
                 phase: "finalizing",
                 logTitle: "Review output",
-                logBody: item.review
+                logBody: item.review,
             });
         }
         return;
@@ -402,8 +415,12 @@ function recordItem(state, item, lifecycle, threadId = null) {
                     ? `Subagent ${sourceLabel} reasoning: ${shorten(nextSections[0], 96)}`
                     : `Reasoning summary captured: ${shorten(nextSections[0], 96)}`,
                 stderrMessage: null,
-                logTitle: sourceLabel ? `Subagent ${sourceLabel} reasoning summary` : "Reasoning summary",
-                logBody: nextSections.map((section) => `- ${section}`).join("\n")
+                logTitle: sourceLabel
+                    ? `Subagent ${sourceLabel} reasoning summary`
+                    : "Reasoning summary",
+                logBody: nextSections
+                    .map((section) => `- ${section}`)
+                    .join("\n"),
             });
         }
         return;
@@ -423,12 +440,12 @@ function applyTurnNotification(state, message) {
                 threadName: message.params.thread.name,
                 name: message.params.thread.name,
                 agentNickname: message.params.thread.agentNickname,
-                agentRole: message.params.thread.agentRole
+                agentRole: message.params.thread.agentRole,
             });
             break;
         case "thread/name/updated":
             registerThread(state, message.params.threadId, {
-                threadName: message.params.threadName ?? null
+                threadName: message.params.threadName ?? null,
             });
             break;
         case "turn/started":
@@ -440,7 +457,7 @@ function applyTurnNotification(state, message) {
             emitProgress(state.onProgress, `Turn started (${message.params.turn.id}).`, "starting", (message.params.threadId ?? null) === state.threadId
                 ? {
                     threadId: message.params.threadId ?? null,
-                    turnId: message.params.turn.id ?? null
+                    turnId: message.params.turn.id ?? null,
                 }
                 : {});
             break;
@@ -483,7 +500,8 @@ async function _captureTurn(client, threadId, startRequest, options = {}) {
             state.bufferedNotifications.push(message);
             return;
         }
-        if (message.method === "thread/started" || message.method === "thread/name/updated") {
+        if (message.method === "thread/started" ||
+            message.method === "thread/name/updated") {
             applyTurnNotification(state, message);
             return;
         }
@@ -532,9 +550,12 @@ async function withAppServer(cwd, fn) {
         return result;
     }
     catch (error) {
-        const brokerRequested = client?.transport === "broker" || Boolean(process.env[BROKER_ENDPOINT_ENV]);
-        const shouldRetryDirect = (client?.transport === "broker" && error?.rpcCode === BROKER_BUSY_RPC_CODE) ||
-            (brokerRequested && (error?.code === "ENOENT" || error?.code === "ECONNREFUSED"));
+        const brokerRequested = client?.transport === "broker" ||
+            Boolean(process.env[BROKER_ENDPOINT_ENV]);
+        const shouldRetryDirect = (client?.transport === "broker" &&
+            error?.rpcCode === BROKER_BUSY_RPC_CODE) ||
+            (brokerRequested &&
+                (error?.code === "ENOENT" || error?.code === "ECONNREFUSED"));
         if (client) {
             await client.close().catch(() => { });
             client = null;
@@ -543,7 +564,7 @@ async function withAppServer(cwd, fn) {
             throw error;
         }
         const directClient = await AgentAppServerClient.connect(cwd, {
-            disableBroker: true
+            disableBroker: true,
         });
         try {
             return await fn(directClient);
@@ -560,7 +581,7 @@ async function _startThread(client, cwd, options = {}) {
         try {
             await client.request("thread/name/set", {
                 threadId,
-                name: options.threadName
+                name: options.threadName,
             });
         }
         catch (err) {
@@ -587,53 +608,55 @@ function buildAuthStatus(fields = {}) {
         authMethod: null,
         verified: null,
         provider: null,
-        ...fields
+        ...fields,
     };
 }
 async function _getAgentAuthStatusFromClient(client, cwd) {
     try {
         const accountResponse = await client.request("account/read", {
-            refreshToken: false
+            refreshToken: false,
         });
         const _configResponse = await client.request("config/read", {
             includeLayers: false,
-            cwd
+            cwd,
         });
         const account = accountResponse?.account ?? null;
         if (account) {
-            const email = typeof account.email === "string" && account.email.trim() ? account.email.trim() : null;
+            const email = typeof account.email === "string" && account.email.trim()
+                ? account.email.trim()
+                : null;
             return buildAuthStatus({
                 loggedIn: true,
                 detail: email ? `Login active for ${email}` : "Login active",
                 source: "app-server",
                 authMethod: account.type ?? "unknown",
-                verified: true
+                verified: true,
             });
         }
         return buildAuthStatus({
             loggedIn: false,
             detail: "Not authenticated",
-            source: "app-server"
+            source: "app-server",
         });
     }
     catch (error) {
         return buildAuthStatus({
             loggedIn: false,
             detail: error instanceof Error ? error.message : String(error),
-            source: "app-server"
+            source: "app-server",
         });
     }
 }
 export function getAgentAvailability(cwd) {
     const versionStatus = binaryAvailable("agent", ["--version"], {
-        cwd
+        cwd,
     });
     if (!versionStatus.available) {
         return versionStatus;
     }
     return {
         available: true,
-        detail: `${versionStatus.detail}; print-mode runtime available`
+        detail: `${versionStatus.detail}; print-mode runtime available`,
     };
 }
 export function getSessionRuntimeStatus(env = process.env, cwd = process.cwd()) {
@@ -643,14 +666,14 @@ export function getSessionRuntimeStatus(env = process.env, cwd = process.cwd()) 
             mode: "shared",
             label: "shared session",
             detail: "This Claude session is configured to reuse one shared Agent runtime.",
-            endpoint
+            endpoint,
         };
     }
     return {
         mode: "direct",
         label: "direct startup",
         detail: "No shared Agent runtime is active yet. The first review or task command will start one on demand.",
-        endpoint: null
+        endpoint: null,
     };
 }
 export async function getAgentAuthStatus(cwd, _options = {}) {
@@ -663,7 +686,7 @@ export async function getAgentAuthStatus(cwd, _options = {}) {
             source: "availability",
             authMethod: null,
             verified: null,
-            provider: null
+            provider: null,
         };
     }
     try {
@@ -672,7 +695,7 @@ export async function getAgentAuthStatus(cwd, _options = {}) {
             return buildAuthStatus({
                 loggedIn: false,
                 detail: result.stderr.trim() || `agent status exited with ${result.status}`,
-                source: "agent-status"
+                source: "agent-status",
             });
         }
         const parsed = JSON.parse(result.stdout.trim());
@@ -683,20 +706,20 @@ export async function getAgentAuthStatus(cwd, _options = {}) {
                 detail: email ? `Login active for ${email}` : "Login active",
                 source: "agent-status",
                 authMethod: "cursor-login",
-                verified: true
+                verified: true,
             });
         }
         return buildAuthStatus({
             loggedIn: false,
             detail: "Not authenticated",
-            source: "agent-status"
+            source: "agent-status",
         });
     }
     catch (error) {
         return buildAuthStatus({
             loggedIn: false,
             detail: error instanceof Error ? error.message : String(error),
-            source: "agent-status"
+            source: "agent-status",
         });
     }
 }
@@ -706,7 +729,7 @@ export async function interruptAppServerTurn(cwd, { threadId, turnId }) {
             attempted: false,
             interrupted: false,
             transport: null,
-            detail: "missing threadId or turnId"
+            detail: "missing threadId or turnId",
         };
     }
     const availability = getAgentAvailability(cwd);
@@ -715,20 +738,20 @@ export async function interruptAppServerTurn(cwd, { threadId, turnId }) {
             attempted: false,
             interrupted: false,
             transport: null,
-            detail: availability.detail
+            detail: availability.detail,
         };
     }
     let client = null;
     try {
         client = await AgentAppServerClient.connect(cwd, {
-            reuseExistingBroker: true
+            reuseExistingBroker: true,
         });
         await client.request("turn/interrupt", { threadId, turnId });
         return {
             attempted: true,
             interrupted: true,
             transport: client.transport,
-            detail: `Interrupted ${turnId} on ${threadId}.`
+            detail: `Interrupted ${turnId} on ${threadId}.`,
         };
     }
     catch (error) {
@@ -736,7 +759,7 @@ export async function interruptAppServerTurn(cwd, { threadId, turnId }) {
             attempted: true,
             interrupted: false,
             transport: client?.transport ?? null,
-            detail: error instanceof Error ? error.message : String(error)
+            detail: error instanceof Error ? error.message : String(error),
         };
     }
     finally {
@@ -756,7 +779,7 @@ async function runAgentPrintMode(cwd, prompt, options = {}) {
             cwd,
             env: process.env,
             stdio: ["pipe", "pipe", "pipe"],
-            shell: false
+            shell: false,
         });
         let stdout = "";
         let stderr = "";
@@ -789,18 +812,20 @@ async function runAgentPrintMode(cwd, prompt, options = {}) {
                     reasoningSummary: [],
                     turn: {
                         id: result.request_id ?? "print-mode",
-                        status: result.is_error ? "failed" : "completed"
+                        status: result.is_error ? "failed" : "completed",
                     },
                     error: result.is_error ? { message: result.result } : null,
                     stderr: cleanedStderr,
                     fileChanges: [],
                     touchedFiles: [],
-                    commandExecutions: []
+                    commandExecutions: [],
                 });
             }
             catch (_e) {
                 const stderrDetail = cleanedStderr ? ` | stderr: ${cleanedStderr}` : "";
-                const stdoutDetail = stdout.trim() ? ` | stdout: ${stdout.slice(0, 200)}` : " | stdout: (empty)";
+                const stdoutDetail = stdout.trim()
+                    ? ` | stdout: ${stdout.slice(0, 200)}`
+                    : " | stdout: (empty)";
                 reject(new Error(`Failed to parse agent output${stdoutDetail}${stderrDetail}`));
             }
         });
@@ -815,7 +840,7 @@ export async function runAppServerReview(cwd, options = {}) {
     const turnResult = await runAgentPrintMode(cwd, "Review the current changes in detail. Provide a thorough code review.", {
         model: options.model,
         sandbox: "read-only",
-        onProgress: options.onProgress
+        onProgress: options.onProgress,
     });
     return {
         status: turnResult.status,
@@ -826,7 +851,7 @@ export async function runAppServerReview(cwd, options = {}) {
         reasoningSummary: turnResult.reasoningSummary,
         turn: turnResult.turn,
         error: turnResult.error,
-        stderr: turnResult.stderr
+        stderr: turnResult.stderr,
     };
 }
 export async function runAppServerTurn(cwd, options = {}) {
@@ -842,7 +867,7 @@ export async function runAppServerTurn(cwd, options = {}) {
     return runAgentPrintMode(cwd, prompt, {
         model: options.model,
         sandbox: options.sandbox,
-        onProgress: options.onProgress
+        onProgress: options.onProgress,
     });
 }
 export async function findLatestTaskThread(cwd) {
@@ -856,9 +881,10 @@ export async function findLatestTaskThread(cwd) {
             limit: 20,
             sortKey: "updated_at",
             sourceKinds: ["appServer"],
-            searchTerm: TASK_THREAD_PREFIX
+            searchTerm: TASK_THREAD_PREFIX,
         });
-        return (response.data.find((thread) => typeof thread.name === "string" && thread.name.startsWith(TASK_THREAD_PREFIX)) ?? null);
+        return (response.data.find((thread) => typeof thread.name === "string" &&
+            thread.name.startsWith(TASK_THREAD_PREFIX)) ?? null);
     });
 }
 export function buildPersistentTaskThreadName(prompt) {
@@ -868,9 +894,10 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
     if (!rawOutput) {
         return {
             parsed: null,
-            parseError: fallback.failureMessage ?? "Agent did not return a final structured message.",
+            parseError: fallback.failureMessage ??
+                "Agent did not return a final structured message.",
             rawOutput: rawOutput ?? "",
-            ...fallback
+            ...fallback,
         };
     }
     try {
@@ -878,7 +905,7 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
             parsed: JSON.parse(rawOutput),
             parseError: null,
             rawOutput,
-            ...fallback
+            ...fallback,
         };
     }
     catch (error) {
@@ -886,7 +913,7 @@ export function parseStructuredOutput(rawOutput, fallback = {}) {
             parsed: null,
             parseError: error.message,
             rawOutput,
-            ...fallback
+            ...fallback,
         };
     }
 }

@@ -13,7 +13,7 @@ export const BROKER_BUSY_RPC_CODE = -32001;
 const DEFAULT_CLIENT_INFO = {
     title: "Agent Plugin",
     name: "Claude Code",
-    version: PLUGIN_MANIFEST.version ?? "0.0.0"
+    version: PLUGIN_MANIFEST.version ?? "0.0.0",
 };
 const DEFAULT_CAPABILITIES = {
     experimentalApi: false,
@@ -21,8 +21,8 @@ const DEFAULT_CAPABILITIES = {
         "item/agentMessage/delta",
         "item/reasoning/summaryTextDelta",
         "item/reasoning/summaryPartAdded",
-        "item/reasoning/textDelta"
-    ]
+        "item/reasoning/textDelta",
+    ],
 };
 function buildJsonRpcError(code, message, data) {
     return data === undefined ? { code, message } : { code, message, data };
@@ -31,6 +31,7 @@ function createProtocolError(message, data) {
     const error = new Error(message);
     error.data = data;
     if (data?.code !== undefined) {
+        ;
         error.rpcCode = data.code;
     }
     return error;
@@ -106,7 +107,7 @@ class AppServerClientBase {
         catch (error) {
             this.handleExit(createProtocolError(`Failed to parse agent app-server JSONL: ${error.message}`, {
                 code: -32700,
-                message: error.message
+                message: error.message,
             }));
             return;
         }
@@ -121,7 +122,8 @@ class AppServerClientBase {
             }
             this.pending.delete(message.id);
             if (message.error) {
-                pending.reject(createProtocolError(message.error.message ?? `agent app-server ${pending.method} failed.`, message.error));
+                pending.reject(createProtocolError(message.error.message ??
+                    `agent app-server ${pending.method} failed.`, message.error));
             }
             else {
                 pending.resolve(message.result ?? {});
@@ -135,7 +137,7 @@ class AppServerClientBase {
     handleServerRequest(message) {
         this.sendMessage({
             id: message.id,
-            error: buildJsonRpcError(-32601, `Unsupported server request: ${message.method}`)
+            error: buildJsonRpcError(-32601, `Unsupported server request: ${message.method}`),
         });
     }
     handleExit(error) {
@@ -173,7 +175,7 @@ class SpawnedAgentAppServerClient extends AppServerClientBase {
             env: this.options.env ?? process.env,
             stdio: ["pipe", "pipe", "pipe"],
             shell: process.platform === "win32" ? process.env.SHELL || true : false,
-            windowsHide: true
+            windowsHide: true,
         });
         this.proc.stdout.setEncoding("utf8");
         this.proc.stderr.setEncoding("utf8");
@@ -195,7 +197,7 @@ class SpawnedAgentAppServerClient extends AppServerClientBase {
         });
         await this.request("initialize", {
             clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
-            capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES
+            capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES,
         });
         this.notify("initialized", {});
     }
@@ -268,7 +270,7 @@ class BrokerAgentAppServerClient extends AppServerClientBase {
         });
         await this.request("initialize", {
             clientInfo: this.options.clientInfo ?? DEFAULT_CLIENT_INFO,
-            capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES
+            capabilities: this.options.capabilities ?? DEFAULT_CAPABILITIES,
         });
         this.notify("initialized", {});
     }
@@ -297,12 +299,17 @@ export class AgentAppServerClient {
         let brokerEndpoint = null;
         if (!options.disableBroker) {
             brokerEndpoint =
-                options.brokerEndpoint ?? options.env?.[BROKER_ENDPOINT_ENV] ?? process.env[BROKER_ENDPOINT_ENV] ?? null;
+                options.brokerEndpoint ??
+                    options.env?.[BROKER_ENDPOINT_ENV] ??
+                    process.env[BROKER_ENDPOINT_ENV] ??
+                    null;
             if (!brokerEndpoint && options.reuseExistingBroker) {
                 brokerEndpoint = loadBrokerSession(cwd)?.endpoint ?? null;
             }
             if (!brokerEndpoint && !options.reuseExistingBroker) {
-                const brokerSession = await ensureBrokerSession(cwd, { env: options.env });
+                const brokerSession = await ensureBrokerSession(cwd, {
+                    env: options.env,
+                });
                 brokerEndpoint = brokerSession?.endpoint ?? null;
             }
         }
