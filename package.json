@@ -1,7 +1,7 @@
 {
-  "name": "@cursor/agent-plugin-cc",
+  "name": "agent-plugin-cc",
   "type": "module",
-  "version": "1.1.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Multi-AI plugins for Claude Code: drive Cursor Agent, OpenAI Codex, or Moonshot Kimi from inside Claude Code for code review and task delegation.",
   "license": "MIT",
